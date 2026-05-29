@@ -1,7 +1,8 @@
 // Assignments stored as { itemId → personName[] } so they survive
 // back-navigation where PUT /people reassigns all person UUIDs.
 
-const PREFIX = "hsbch";
+// v2: stored by person name (not UUID) so they survive PUT /people
+const PREFIX = "hsbch_v2";
 
 type NameAssignments = Record<string, string[]>;
 
