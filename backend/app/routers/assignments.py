@@ -21,12 +21,13 @@ def update_assignments(
     if not session:
         raise HTTPException(404, "Session not found")
 
-    item_ids = [
-        i.id
-        for i in db.execute(select(Item).where(Item.session_id == session_id))
-        .scalars()
-        .all()
-    ]
+    # Fetch valid person IDs for this session (guards against stale IDs from client)
+    people_result = await db.execute(select(Person.id).where(Person.session_id == session_id))
+    valid_person_ids = {row[0] for row in people_result.all()}
+
+    # Clear existing assignments for this session's items
+    items_result = await db.execute(select(Item).where(Item.session_id == session_id))
+    item_ids = [i.id for i in items_result.scalars().all()]
     if item_ids:
         for a in (
             db.execute(select(Assignment).where(Assignment.item_id.in_(item_ids)))
@@ -37,7 +38,8 @@ def update_assignments(
 
     for entry in body.assignments:
         for person_id in entry.person_ids:
-            db.add(Assignment(item_id=entry.item_id, person_id=person_id))
+            if person_id in valid_person_ids:
+                db.add(Assignment(item_id=entry.item_id, person_id=person_id))
 
     session.status = "done"
     db.commit()

@@ -5,10 +5,15 @@ from app.models import Person
 from app.models import Session as SessionModel
 from app.schemas import PeopleUpdate, PersonOut
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/sessions", tags=["people"])
+
+
+class AddPersonBody(BaseModel):
+    name: str
 
 
 @router.get("/{session_id}/people", response_model=list[PersonOut])
@@ -18,6 +23,22 @@ def list_people(session_id: uuid.UUID, db: Session = Depends(get_db)):
         .scalars()
         .all()
     )
+
+
+@router.post("/{session_id}/people", response_model=PersonOut)
+async def add_person(
+    session_id: uuid.UUID,
+    body: AddPersonBody,
+    db: AsyncSession = Depends(get_db),
+):
+    session = await db.get(Session, session_id)
+    if not session:
+        raise HTTPException(404, "Session not found")
+    person = Person(session_id=session_id, name=body.name.strip())
+    db.add(person)
+    await db.commit()
+    await db.refresh(person)
+    return person
 
 
 @router.put("/{session_id}/people", response_model=list[PersonOut])
