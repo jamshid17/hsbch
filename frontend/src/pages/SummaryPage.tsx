@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, SummaryOut } from "../api";
+import { tg } from "../telegram";
 import Skeleton from "../components/Skeleton";
 
 export default function SummaryPage() {
@@ -20,34 +21,35 @@ export default function SummaryPage() {
       .finally(() => setLoading(false));
   }, [sessionId]);
 
-  function buildShareText(s: SummaryOut) {
-    const lines = s.people.map(
-      (p) => `${p.name}: ${s.currency}${p.total}`
-    );
-    return `Bill split 🧾\n${lines.join("\n")}`;
-  }
-
   async function handleShare() {
     if (!summary) return;
-    const text = buildShareText(summary);
 
-    // 1. Native share sheet (mobile browsers + Telegram WebView)
+    // Inside Telegram — open contact/chat picker, bot sends the formatted receipt
+    if (tg.initData) {
+      tg.switchInlineQuery(sessionId!, ["users", "groups"]);
+      return;
+    }
+
+    // Outside Telegram — native share sheet or clipboard fallback
+    const lines = summary.people.map(
+      (p) => `${p.name}: ${summary.currency}${p.total}`
+    );
+    const text = `🧾 Bill split\n${lines.join("\n")}`;
+
     if (navigator.share) {
       try {
         await navigator.share({ text });
         return;
       } catch {
-        // user cancelled or not supported — fall through
+        // user cancelled — fall through
       }
     }
 
-    // 2. Clipboard copy
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      // clipboard also blocked — show the text in an alert
       window.alert(text);
     }
   }
@@ -93,29 +95,29 @@ export default function SummaryPage() {
                 </span>
               </div>
             ))}
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <span style={{ color: "var(--hint)", fontSize: 13 }}>Tax + tip share</span>
-              <span style={{ color: "var(--hint)", fontSize: 13 }}>
-                {summary.currency}{person.extras}
-              </span>
-            </div>
+            {parseFloat(person.extras) > 0 && (
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <span style={{ color: "var(--hint)", fontSize: 13 }}>Tax + tip share</span>
+                <span style={{ color: "var(--hint)", fontSize: 13 }}>
+                  {summary.currency}{person.extras}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       ))}
 
-      <button className="btn btn-ghost" onClick={handleShare}>
-        Share results
+      <button className="btn" onClick={handleShare}>
+        {tg.initData ? "📤 Share in Telegram" : "Share results"}
       </button>
 
       <button
-        className="btn"
-        style={{ background: "var(--secondary-bg)", color: "var(--text)" }}
+        className="btn btn-ghost"
         onClick={() => navigate("/")}
       >
         Split another bill
       </button>
 
-      {/* Copied toast */}
       <AnimatePresence>
         {copied && (
           <motion.div
