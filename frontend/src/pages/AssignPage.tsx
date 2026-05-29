@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 import { api, ItemOut, PersonOut } from "../api";
@@ -9,10 +9,14 @@ import Skeleton from "../components/Skeleton";
 export default function AssignPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [assignments, setAssignments] = useState<Record<string, Set<string>>>({});
   const [activeItem, setActiveItem] = useState<ItemOut | null>(null);
+  const [newName, setNewName] = useState("");
+  const [showAddInput, setShowAddInput] = useState(false);
   const [error, setError] = useState("");
+  const addInputRef = useRef<HTMLInputElement>(null);
 
   const { data: items, isLoading: itemsLoading } = useQuery<ItemOut[]>({
     queryKey: ["items", sessionId],
@@ -34,6 +38,21 @@ export default function AssignPage() {
       return next;
     });
   }, [items]);
+
+  useEffect(() => {
+    if (showAddInput) addInputRef.current?.focus();
+  }, [showAddInput]);
+
+  const addPersonMutation = useMutation({
+    mutationFn: (name: string) => api.addPerson(sessionId!, name),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["people", sessionId] });
+      setNewName("");
+      setShowAddInput(false);
+    },
+    onError: (e: unknown) =>
+      setError(e instanceof Error ? e.message : "Failed to add person"),
+  });
 
   const saveMutation = useMutation({
     mutationFn: () => {
@@ -58,6 +77,12 @@ export default function AssignPage() {
 
   function assignedCount(itemId: string) {
     return assignments[itemId]?.size ?? 0;
+  }
+
+  function handleAddPerson() {
+    const name = newName.trim();
+    if (!name) return;
+    addPersonMutation.mutate(name);
   }
 
   if (itemsLoading || peopleLoading) {
@@ -98,6 +123,56 @@ export default function AssignPage() {
           </motion.div>
         );
       })}
+
+      {/* People list with add button */}
+      <div className="card" style={{ gap: 10 }}>
+        <div className="label" style={{ marginBottom: 0 }}>People at the table</div>
+        {people?.map((p) => (
+          <div key={p.id} style={{ fontSize: 15, paddingLeft: 2 }}>👤 {p.name}</div>
+        ))}
+
+        <AnimatePresence>
+          {showAddInput && (
+            <motion.div
+              className="row"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.18 }}
+              style={{ overflow: "hidden" }}
+            >
+              <input
+                ref={addInputRef}
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Enter name"
+                style={{ flex: 1 }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAddPerson();
+                  if (e.key === "Escape") { setShowAddInput(false); setNewName(""); }
+                }}
+              />
+              <button
+                className="btn"
+                style={{ width: "auto", padding: "10px 16px" }}
+                disabled={!newName.trim() || addPersonMutation.isPending}
+                onClick={handleAddPerson}
+              >
+                Add
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <button
+          className="btn btn-ghost"
+          style={{ padding: "8px 12px", fontSize: 14 }}
+          onClick={() => setShowAddInput((v) => !v)}
+        >
+          {showAddInput ? "Cancel" : "+ Add person"}
+        </button>
+      </div>
 
       {error && <p className="error">{error}</p>}
 

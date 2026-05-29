@@ -84,6 +84,12 @@ export const api = {
   listItems: (sessionId: string) =>
     request<ItemOut[]>(`/sessions/${sessionId}/items`),
 
+  addPerson: (sessionId: string, name: string) =>
+    request<PersonOut>(`/sessions/${sessionId}/people`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
   updatePeople: (sessionId: string, people: { name: string }[]) =>
     request<PersonOut[]>(`/sessions/${sessionId}/people`, {
       method: "PUT",

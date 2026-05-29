@@ -55,6 +55,7 @@ export default function PeoplePage() {
             onChange={(e) => updateName(idx, e.target.value)}
             placeholder={`Person ${idx + 1}`}
             style={{ flex: 1 }}
+            autoFocus={idx === names.length - 1 && idx > 0}
           />
           {names.length > 1 && (
             <button
