@@ -56,10 +56,10 @@ export interface ScanResult {
 }
 
 export const api = {
-  createSession: (telegram_user_id: number, telegram_chat_id: number) =>
+  createSession: (telegram_chat_id: number) =>
     request<SessionOut>("/sessions", {
       method: "POST",
-      body: JSON.stringify({ telegram_user_id, telegram_chat_id }),
+      body: JSON.stringify({ telegram_chat_id }),
     }),
 
   uploadReceipt: (sessionId: string, file: File) => {

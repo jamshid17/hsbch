@@ -1,12 +1,12 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.db import get_db
-from app.models import Item, Session
+from app.models import Item
+from app.models import Session as SessionModel
 from app.schemas import ScanResult
-from app.vision import scan_receipt
+from app.services.vision import scan_receipt
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/sessions", tags=["receipt"])
 
@@ -15,9 +15,9 @@ router = APIRouter(prefix="/api/sessions", tags=["receipt"])
 async def upload_receipt(
     session_id: uuid.UUID,
     file: UploadFile,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
-    session = await db.get(Session, session_id)
+    session = db.get(SessionModel, session_id)
     if not session:
         raise HTTPException(404, "Session not found")
 
@@ -30,13 +30,15 @@ async def upload_receipt(
     session.status = "editing"
 
     for item_data in result.items:
-        db.add(Item(
-            session_id=session_id,
-            name=item_data.name,
-            price=item_data.price,
-            quantity=item_data.quantity,
-            unit=item_data.unit,
-        ))
+        db.add(
+            Item(
+                session_id=session_id,
+                name=item_data.name,
+                price=item_data.price,
+                quantity=item_data.quantity,
+                unit=item_data.unit,
+            )
+        )
 
-    await db.commit()
+    db.commit()
     return result

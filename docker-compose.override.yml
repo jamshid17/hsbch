@@ -1,0 +1,5 @@
+# docker-compose.override.yml  (dev only — the bind mount + live reload)
+services:
+  app:
+    volumes:
+      - ./backend:/app
