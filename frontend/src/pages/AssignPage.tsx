@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 import { api, ItemOut, PersonOut } from "../api";
 import Skeleton from "../components/Skeleton";
+import { storage } from "../lib/storage";
 
 export default function AssignPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -12,6 +13,7 @@ export default function AssignPage() {
   const queryClient = useQueryClient();
 
   const [assignments, setAssignments] = useState<Record<string, Set<string>>>({});
+  const [initialized, setInitialized] = useState(false);
   const [activeItem, setActiveItem] = useState<ItemOut | null>(null);
   const [newName, setNewName] = useState("");
   const [showAddInput, setShowAddInput] = useState(false);
@@ -28,16 +30,38 @@ export default function AssignPage() {
     queryFn: () => api.listPeople(sessionId!),
   });
 
+  // Restore assignments from localStorage (matched by person name → current ID)
   useEffect(() => {
-    if (!items) return;
-    setAssignments((prev) => {
-      const next = { ...prev };
-      items.forEach((item) => {
-        if (!next[item.id]) next[item.id] = new Set();
+    if (!items || !people || initialized) return;
+
+    const saved = storage.loadAssignments(sessionId!);
+    const nameToId = Object.fromEntries(people.map((p) => [p.name, p.id]));
+
+    const next: Record<string, Set<string>> = {};
+    items.forEach((item) => {
+      next[item.id] = new Set();
+      saved?.[item.id]?.forEach((name) => {
+        const id = nameToId[name];
+        if (id) next[item.id].add(id);
       });
-      return next;
     });
-  }, [items]);
+
+    setAssignments(next);
+    setInitialized(true);
+  }, [items, people, initialized, sessionId]);
+
+  // Persist assignments to localStorage on every change (store by person name)
+  useEffect(() => {
+    if (!people || !initialized) return;
+    const idToName = Object.fromEntries(people.map((p) => [p.id, p.name]));
+    const byName: Record<string, string[]> = {};
+    Object.entries(assignments).forEach(([itemId, ids]) => {
+      byName[itemId] = Array.from(ids)
+        .map((id) => idToName[id])
+        .filter(Boolean) as string[];
+    });
+    storage.saveAssignments(sessionId!, byName);
+  }, [assignments, people, initialized, sessionId]);
 
   useEffect(() => {
     if (showAddInput) addInputRef.current?.focus();
@@ -62,7 +86,10 @@ export default function AssignPage() {
       }));
       return api.updateAssignments(sessionId!, payload);
     },
-    onSuccess: () => navigate(`/summary/${sessionId}`),
+    onSuccess: () => {
+      storage.clearAssignments(sessionId!);
+      navigate(`/summary/${sessionId}`);
+    },
     onError: (e: unknown) =>
       setError(e instanceof Error ? e.message : "Failed to save"),
   });
@@ -96,7 +123,16 @@ export default function AssignPage() {
 
   return (
     <div className="page">
-      <h1>Who had what?</h1>
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+        <h1>Who had what?</h1>
+        <button
+          onClick={() => navigate(`/people/${sessionId}`)}
+          style={{ background: "none", border: "none", color: "var(--link)", fontSize: 14, cursor: "pointer", padding: 0 }}
+        >
+          ← Edit people
+        </button>
+      </div>
+
       <p style={{ color: "var(--hint)", fontSize: 14 }}>
         Tap an item to select who ate it.
       </p>
@@ -124,7 +160,7 @@ export default function AssignPage() {
         );
       })}
 
-      {/* People list with add button */}
+      {/* People list with quick-add */}
       <div className="card" style={{ gap: 10 }}>
         <div className="label" style={{ marginBottom: 0 }}>People at the table</div>
         {people?.map((p) => (

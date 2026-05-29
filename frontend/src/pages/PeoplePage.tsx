@@ -1,14 +1,29 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "../api";
+import Skeleton from "../components/Skeleton";
 
 export default function PeoplePage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
 
-  const [names, setNames] = useState<string[]>(["", ""]);
+  const [names, setNames] = useState<string[]>([]);
+  const [initialized, setInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const { data: existingPeople, isLoading } = useQuery({
+    queryKey: ["people", sessionId],
+    queryFn: () => api.listPeople(sessionId!),
+  });
+
+  // Initialize from API — runs once when data arrives
+  useEffect(() => {
+    if (initialized || !existingPeople) return;
+    setNames(existingPeople.length > 0 ? existingPeople.map((p) => p.name) : ["", ""]);
+    setInitialized(true);
+  }, [existingPeople, initialized]);
 
   function updateName(idx: number, value: string) {
     setNames((prev) => prev.map((n, i) => (i === idx ? value : n)));
@@ -38,6 +53,15 @@ export default function PeoplePage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  if (isLoading && !initialized) {
+    return (
+      <div className="page">
+        <h1>Who's at the table?</h1>
+        <Skeleton count={2} height={48} />
+      </div>
+    );
   }
 
   return (
