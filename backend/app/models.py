@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -22,7 +22,7 @@ class Session(Base):
     tax: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     tip: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="scanning")
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     items: Mapped[list["Item"]] = relationship("Item", back_populates="session", cascade="all, delete-orphan")
     people: Mapped[list["Person"]] = relationship("Person", back_populates="session", cascade="all, delete-orphan")

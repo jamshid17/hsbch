@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { api, SummaryOut } from "../api";
-import { tg } from "../telegram";
+import Skeleton from "../components/Skeleton";
 
 export default function SummaryPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -10,6 +11,7 @@ export default function SummaryPage() {
   const [summary, setSummary] = useState<SummaryOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     api.getSummary(sessionId!)
@@ -18,17 +20,55 @@ export default function SummaryPage() {
       .finally(() => setLoading(false));
   }, [sessionId]);
 
-  function handleShare() {
-    if (!summary) return;
-    const lines = summary.people.map(
-      (p) => `${p.name}: ${summary.currency}${p.total}`
+  function buildShareText(s: SummaryOut) {
+    const lines = s.people.map(
+      (p) => `${p.name}: ${s.currency}${p.total}`
     );
-    const text = `Bill split:\n${lines.join("\n")}`;
-    tg.switchInlineQuery?.(text);
+    return `Bill split 🧾\n${lines.join("\n")}`;
   }
 
-  if (loading) return <div className="spinner">Calculating…</div>;
-  if (error) return <div className="page"><p className="error">{error}</p></div>;
+  async function handleShare() {
+    if (!summary) return;
+    const text = buildShareText(summary);
+
+    // 1. Native share sheet (mobile browsers + Telegram WebView)
+    if (navigator.share) {
+      try {
+        await navigator.share({ text });
+        return;
+      } catch {
+        // user cancelled or not supported — fall through
+      }
+    }
+
+    // 2. Clipboard copy
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // clipboard also blocked — show the text in an alert
+      window.alert(text);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="page">
+        <h1>Who owes what</h1>
+        <Skeleton count={3} height={120} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="page">
+        <p className="error">{error}</p>
+      </div>
+    );
+  }
+
   if (!summary) return null;
 
   return (
@@ -74,6 +114,21 @@ export default function SummaryPage() {
       >
         Split another bill
       </button>
+
+      {/* Copied toast */}
+      <AnimatePresence>
+        {copied && (
+          <motion.div
+            className="toast"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.2 }}
+          >
+            ✓ Copied to clipboard
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
