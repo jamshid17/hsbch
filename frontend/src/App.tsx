@@ -5,12 +5,16 @@ import PeoplePage from "./pages/PeoplePage";
 import AssignPage from "./pages/AssignPage";
 import SummaryPage from "./pages/SummaryPage";
 import ProgressSteps from "./components/ProgressSteps";
+import LanguageSwitcher from "./components/LanguageSwitcher";
 import "./app.css";
 
 export default function App() {
   return (
     <>
-      <ProgressSteps />
+      <div className="top-bar">
+        <ProgressSteps />
+        <LanguageSwitcher />
+      </div>
       <Routes>
         <Route path="/" element={<ScanPage />} />
         <Route path="/edit/:sessionId" element={<EditItemsPage />} />
