@@ -1,7 +1,7 @@
 import uuid
 
 from app.db import get_db
-from app.models import Assignment, Item
+from app.models import Assignment, Item, Person
 from app.models import Session as SessionModel
 from app.schemas import AssignmentsUpdate
 from fastapi import APIRouter, Depends, HTTPException
@@ -21,13 +21,14 @@ def update_assignments(
     if not session:
         raise HTTPException(404, "Session not found")
 
-    # Fetch valid person IDs for this session (guards against stale IDs from client)
-    people_result = await db.execute(select(Person.id).where(Person.session_id == session_id))
-    valid_person_ids = {row[0] for row in people_result.all()}
+    valid_person_ids = set(
+        db.execute(select(Person.id).where(Person.session_id == session_id)).scalars().all()
+    )
 
-    # Clear existing assignments for this session's items
-    items_result = await db.execute(select(Item).where(Item.session_id == session_id))
-    item_ids = [i.id for i in items_result.scalars().all()]
+    item_ids = [
+        i.id
+        for i in db.execute(select(Item).where(Item.session_id == session_id)).scalars().all()
+    ]
     if item_ids:
         for a in (
             db.execute(select(Assignment).where(Assignment.item_id.in_(item_ids)))

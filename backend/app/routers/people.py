@@ -26,18 +26,18 @@ def list_people(session_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/{session_id}/people", response_model=PersonOut)
-async def add_person(
+def add_person(
     session_id: uuid.UUID,
     body: AddPersonBody,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
-    session = await db.get(Session, session_id)
+    session = db.get(SessionModel, session_id)
     if not session:
         raise HTTPException(404, "Session not found")
     person = Person(session_id=session_id, name=body.name.strip())
     db.add(person)
-    await db.commit()
-    await db.refresh(person)
+    db.commit()
+    db.refresh(person)
     return person
 
 
