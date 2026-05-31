@@ -60,6 +60,7 @@ export default {
     shareBtnFallback: "Поделиться",
     splitAnother: "Разделить другой счёт",
     copied: "✓ Скопировано",
+    grandTotal: "Итого",
     failedLoad: "Ошибка загрузки",
   },
 } as const;

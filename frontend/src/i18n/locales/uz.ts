@@ -10,8 +10,8 @@ export default {
     title: "Hisob bo'luvchi",
     subtitle: "Chek rasmini oling, biz taqsimlab beramiz.",
     tapToSelect: "Chek rasmini tanlash uchun bosing",
-    scanBtn: "Chekni skanlamoq",
-    scanning: "Skanlanmoqda…",
+    scanBtn: "Chekni skanerlash",
+    scanning: "Skanerlanmoqda…",
   },
   edit: {
     title: "Mahsulotlarni tekshiring",
@@ -60,6 +60,7 @@ export default {
     shareBtnFallback: "Natijalarni ulashish",
     splitAnother: "Yana hisob bo'lish",
     copied: "✓ Buferga nusxalandi",
+    grandTotal: "Jami",
     failedLoad: "Yuklab bo'lmadi",
   },
 } as const;

@@ -60,6 +60,7 @@ export default {
     shareBtnFallback: "Share results",
     splitAnother: "Split another bill",
     copied: "✓ Copied to clipboard",
+    grandTotal: "Grand total",
     failedLoad: "Failed to load",
   },
 } as const;

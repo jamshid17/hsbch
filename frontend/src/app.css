@@ -351,6 +351,93 @@ input:focus {
   color: var(--button-text);
 }
 
+/* ── Summary cards ── */
+.summary-card {
+  background: var(--secondary-bg);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  gap: 12px;
+}
+
+.summary-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.summary-total-block {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.summary-total {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--button);
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-cur {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--button);
+  opacity: 0.85;
+}
+
+.summary-rows {
+  border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  padding: 4px 0 8px;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 16px;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.summary-row-name {
+  flex: 1;
+  color: var(--text);
+}
+
+.summary-row-amt {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.summary-row-extra {
+  color: var(--hint);
+  font-size: 13px;
+  border-top: 1px dashed color-mix(in srgb, var(--text) 10%, transparent);
+  margin-top: 2px;
+}
+
+.grand-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--secondary-bg);
+  border-radius: 16px;
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Toast ── */
 .toast {
   position: fixed;
