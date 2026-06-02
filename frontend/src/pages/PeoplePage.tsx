@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "../api";
 import Skeleton from "../components/Skeleton";
@@ -10,6 +10,7 @@ export default function PeoplePage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
 
+  const queryClient = useQueryClient();
   const [names, setNames] = useState<string[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -39,6 +40,7 @@ export default function PeoplePage() {
     setError("");
     try {
       await api.updatePeople(sessionId!, filled.map((name) => ({ name })));
+      await queryClient.invalidateQueries({ queryKey: ["people", sessionId] });
       navigate(`/assign/${sessionId}`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t("people.failedSave"));
