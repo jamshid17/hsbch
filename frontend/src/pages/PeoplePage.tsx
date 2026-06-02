@@ -9,6 +9,7 @@ export default function PeoplePage() {
   const { t } = useTranslation();
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const queryClient = useQueryClient();
   const [names, setNames] = useState<string[]>([]);
@@ -40,7 +41,6 @@ export default function PeoplePage() {
     setError("");
     try {
       await api.updatePeople(sessionId!, filled.map((name) => ({ name })));
-      await queryClient.invalidateQueries({ queryKey: ["people", sessionId] });
       navigate(`/assign/${sessionId}`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t("people.failedSave"));

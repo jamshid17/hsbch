@@ -6,13 +6,11 @@ from pydantic import BaseModel
 
 # Session
 class SessionCreate(BaseModel):
-    telegram_user_id: int
     telegram_chat_id: int
 
 
 class SessionOut(BaseModel):
     id: uuid.UUID
-    telegram_user_id: int
     telegram_chat_id: int
     currency: str
     tax: Decimal

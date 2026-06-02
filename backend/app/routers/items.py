@@ -1,36 +1,35 @@
 import uuid
 
+from app.db import get_db
+from app.models import Item
+from app.models import Session as SessionModel
+from app.schemas import ItemOut, ItemsUpdate
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.db import get_db
-from app.models import Assignment, Item, Session
-from app.schemas import ItemOut, ItemsUpdate
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/sessions", tags=["items"])
 
 
 @router.get("/{session_id}/items", response_model=list[ItemOut])
-async def list_items(session_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Item).where(Item.session_id == session_id))
-    return result.scalars().all()
+def list_items(session_id: uuid.UUID, db: Session = Depends(get_db)):
+    return db.execute(select(Item).where(Item.session_id == session_id)).scalars().all()
 
 
 @router.put("/{session_id}/items", response_model=list[ItemOut])
-async def update_items(
+def update_items(
     session_id: uuid.UUID,
     body: ItemsUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
-    session = await db.get(Session, session_id)
+    session = db.get(SessionModel, session_id)
     if not session:
         raise HTTPException(404, "Session not found")
 
-    # Delete existing items (cascades assignments)
-    existing = await db.execute(select(Item).where(Item.session_id == session_id))
-    for item in existing.scalars().all():
-        await db.delete(item)
+    for item in (
+        db.execute(select(Item).where(Item.session_id == session_id)).scalars().all()
+    ):
+        db.delete(item)
 
     session.currency = body.currency
     session.tax = body.tax
@@ -48,7 +47,7 @@ async def update_items(
         for i in body.items
     ]
     db.add_all(new_items)
-    await db.commit()
+    db.commit()
     for item in new_items:
-        await db.refresh(item)
+        db.refresh(item)
     return new_items

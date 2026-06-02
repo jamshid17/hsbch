@@ -26,8 +26,8 @@ export default function ScanPage() {
     setLoading(true);
     setError("");
     try {
-      const { userId, chatId } = getTelegramUser();
-      const session = await api.createSession(userId, chatId);
+      const { chatId } = getTelegramUser();
+      const session = await api.createSession(chatId);
       await api.uploadReceipt(session.id, file);
       navigate(`/edit/${session.id}`);
     } catch (e: unknown) {

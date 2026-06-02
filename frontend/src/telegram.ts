@@ -5,7 +5,7 @@ export const tg = WebApp;
 export function getTelegramUser() {
   const user = WebApp.initDataUnsafe?.user;
   return {
-    userId: user?.id ?? 0,
+    // userId: user?.id ?? 0,
     chatId: user?.id ?? 0, // In Mini App, use user id as chat id fallback
   };
 }
