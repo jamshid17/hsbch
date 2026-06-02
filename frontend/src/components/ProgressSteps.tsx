@@ -1,18 +1,20 @@
 import { useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import clsx from "clsx";
-
-const STEPS = [
-  { label: "Scan", pattern: /^\/$/ },
-  { label: "Items", pattern: /^\/edit\// },
-  { label: "People", pattern: /^\/people\// },
-  { label: "Assign", pattern: /^\/assign\// },
-  { label: "Summary", pattern: /^\/summary\// },
-];
 
 export default function ProgressSteps() {
   const { pathname } = useLocation();
-  const currentIndex = STEPS.findIndex((s) => s.pattern.test(pathname));
+  const { t } = useTranslation();
 
+  const STEPS = [
+    { label: t("steps.scan"),    pattern: /^\/$/ },
+    { label: t("steps.items"),   pattern: /^\/edit\// },
+    { label: t("steps.people"),  pattern: /^\/people\// },
+    { label: t("steps.assign"),  pattern: /^\/assign\// },
+    { label: t("steps.summary"), pattern: /^\/summary\// },
+  ];
+
+  const currentIndex = STEPS.findIndex((s) => s.pattern.test(pathname));
   if (currentIndex === -1) return null;
 
   return (

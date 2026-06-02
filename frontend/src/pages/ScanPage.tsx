@@ -1,9 +1,11 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api } from "../api";
 import { getTelegramUser } from "../telegram";
 
 export default function ScanPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -29,7 +31,7 @@ export default function ScanPage() {
       await api.uploadReceipt(session.id, file);
       navigate(`/edit/${session.id}`);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(e instanceof Error ? e.message : t("scan.scanning"));
     } finally {
       setLoading(false);
     }
@@ -37,10 +39,8 @@ export default function ScanPage() {
 
   return (
     <div className="page">
-      <h1>Bill Splitter</h1>
-      <p style={{ color: "var(--hint)", fontSize: 14 }}>
-        Take a photo of your receipt and we'll split it for you.
-      </p>
+      <h1>{t("scan.title")}</h1>
+      <p style={{ color: "var(--hint)", fontSize: 14 }}>{t("scan.subtitle")}</p>
 
       <div
         className="card"
@@ -56,7 +56,7 @@ export default function ScanPage() {
         ) : (
           <div style={{ textAlign: "center", color: "var(--hint)" }}>
             <div style={{ fontSize: 48 }}>📷</div>
-            <div style={{ marginTop: 8, fontSize: 15 }}>Tap to select receipt photo</div>
+            <div style={{ marginTop: 8, fontSize: 15 }}>{t("scan.tapToSelect")}</div>
           </div>
         )}
         <input
@@ -72,7 +72,7 @@ export default function ScanPage() {
       {error && <p className="error">{error}</p>}
 
       <button className="btn" disabled={!file || loading} onClick={handleScan}>
-        {loading ? "Scanning…" : "Scan Receipt"}
+        {loading ? t("scan.scanning") : t("scan.scanBtn")}
       </button>
     </div>
   );

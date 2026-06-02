@@ -1,10 +1,23 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, SummaryOut } from "../api";
+import { tg } from "../telegram";
 import Skeleton from "../components/Skeleton";
 
+// Format number with space as thousands separator, strip trailing .00
+function fmt(value: string | number): string {
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  const hasDecimals = num % 1 !== 0;
+  return num.toLocaleString("ru-RU", {
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: 2,
+  });
+}
+
 export default function SummaryPage() {
+  const { t } = useTranslation();
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
 
@@ -16,116 +29,94 @@ export default function SummaryPage() {
   useEffect(() => {
     api.getSummary(sessionId!)
       .then(setSummary)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : t("summary.failedLoad")))
       .finally(() => setLoading(false));
   }, [sessionId]);
 
-  function buildShareText(s: SummaryOut) {
-    const lines = s.people.map(
-      (p) => `${p.name}: ${s.currency}${p.total}`
-    );
-    return `Bill split 🧾\n${lines.join("\n")}`;
-  }
-
   async function handleShare() {
     if (!summary) return;
-    const text = buildShareText(summary);
-
-    // 1. Native share sheet (mobile browsers + Telegram WebView)
-    if (navigator.share) {
-      try {
-        await navigator.share({ text });
-        return;
-      } catch {
-        // user cancelled or not supported — fall through
-      }
+    if (tg.initData) {
+      tg.switchInlineQuery(sessionId!, ["users", "groups"]);
+      return;
     }
-
-    // 2. Clipboard copy
+    const lines = summary.people.map((p) => `${p.name}: ${fmt(p.total)} ${summary.currency}`);
+    const text = `🧾 Bill split\n${lines.join("\n")}`;
+    if (navigator.share) {
+      try { await navigator.share({ text }); return; } catch { /* cancelled */ }
+    }
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
-    } catch {
-      // clipboard also blocked — show the text in an alert
-      window.alert(text);
-    }
+    } catch { window.alert(text); }
   }
 
-  if (loading) {
-    return (
-      <div className="page">
-        <h1>Who owes what</h1>
-        <Skeleton count={3} height={120} />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="page">
-        <p className="error">{error}</p>
-      </div>
-    );
-  }
-
+  if (loading) return <div className="page"><h1>{t("summary.title")}</h1><Skeleton count={3} height={130} /></div>;
+  if (error) return <div className="page"><p className="error">{error}</p></div>;
   if (!summary) return null;
+
+  const grandTotal = summary.people.reduce((sum, p) => sum + parseFloat(p.total), 0);
 
   return (
     <div className="page">
-      <h1>Who owes what</h1>
+      <h1>{t("summary.title")}</h1>
 
-      {summary.people.map((person) => (
-        <div className="card" key={person.person_id}>
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <span style={{ fontWeight: 700, fontSize: 17 }}>{person.name}</span>
-            <span style={{ fontWeight: 700, fontSize: 17 }}>
-              {summary.currency}{person.total}
-            </span>
-          </div>
-
-          <div style={{ borderTop: "1px solid var(--secondary-bg)", paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
-            {person.items.map((item, idx) => (
-              <div className="row" key={idx} style={{ justifyContent: "space-between" }}>
-                <span style={{ color: "var(--hint)", fontSize: 14 }}>{item.name}</span>
-                <span style={{ color: "var(--hint)", fontSize: 14 }}>
-                  {summary.currency}{item.share}
-                </span>
-              </div>
-            ))}
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <span style={{ color: "var(--hint)", fontSize: 13 }}>Tax + tip share</span>
-              <span style={{ color: "var(--hint)", fontSize: 13 }}>
-                {summary.currency}{person.extras}
-              </span>
+      {summary.people.map((person, i) => (
+        <motion.div
+          key={person.person_id}
+          className="summary-card"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: i * 0.06 }}
+        >
+          {/* Header: name + total */}
+          <div className="summary-header">
+            <span className="summary-name">👤 {person.name}</span>
+            <div className="summary-total-block">
+              <span className="summary-total">{fmt(person.total)}</span>
+              <span className="summary-cur">{summary.currency}</span>
             </div>
           </div>
-        </div>
+
+          {/* Item rows */}
+          <div className="summary-rows">
+            {person.items.map((item, idx) => (
+              <div className="summary-row" key={idx}>
+                <span className="summary-row-name">{item.name}</span>
+                <span className="summary-row-amt">{fmt(item.share)}</span>
+              </div>
+            ))}
+            {parseFloat(person.extras) > 0 && (
+              <div className="summary-row summary-row-extra">
+                <span>{t("summary.taxTip")}</span>
+                <span>{fmt(person.extras)}</span>
+              </div>
+            )}
+          </div>
+        </motion.div>
       ))}
 
-      <button className="btn btn-ghost" onClick={handleShare}>
-        Share results
+      {/* Grand total */}
+      <div className="grand-total">
+        <span>{t("summary.grandTotal")}</span>
+        <span>{fmt(grandTotal)} {summary.currency}</span>
+      </div>
+
+      <button className="btn" onClick={handleShare}>
+        {tg.initData ? t("summary.shareBtn") : t("summary.shareBtnFallback")}
       </button>
 
-      <button
-        className="btn"
-        style={{ background: "var(--secondary-bg)", color: "var(--text)" }}
-        onClick={() => navigate("/")}
-      >
-        Split another bill
+      <button className="btn btn-ghost" onClick={() => navigate("/")}>
+        {t("summary.splitAnother")}
       </button>
 
-      {/* Copied toast */}
       <AnimatePresence>
         {copied && (
-          <motion.div
-            className="toast"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.2 }}
+          <motion.div className="toast"
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }} transition={{ duration: 0.2 }}
           >
-            ✓ Copied to clipboard
+            {t("summary.copied")}
           </motion.div>
         )}
       </AnimatePresence>

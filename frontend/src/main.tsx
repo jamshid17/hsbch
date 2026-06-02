@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import { tg } from "./telegram";
+import "./i18n";
 
 tg.ready();
 tg.expand();
