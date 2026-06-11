@@ -1,4 +1,6 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { tg } from "./telegram";
 import EntryPage from "./pages/EntryPage";
 import ScanPage from "./pages/ScanPage";
 import EditItemsPage from "./pages/EditItemsPage";
@@ -10,7 +12,33 @@ import ProgressSteps from "./components/ProgressSteps";
 import LanguageSwitcher from "./components/LanguageSwitcher";
 import "./app.css";
 
+// Show the native Telegram back button on every screen except the home/entry
+// page, and navigate back through history when it's tapped.
+function useTelegramBackButton() {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const back = tg.BackButton;
+    if (!back) return;
+
+    if (pathname === "/") {
+      back.hide();
+      return;
+    }
+
+    const onBack = () => navigate(-1);
+    back.onClick(onBack);
+    back.show();
+    return () => {
+      back.offClick(onBack);
+      back.hide();
+    };
+  }, [pathname, navigate]);
+}
+
 export default function App() {
+  useTelegramBackButton();
   return (
     <>
       <div className="top-bar">

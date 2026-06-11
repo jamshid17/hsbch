@@ -37,8 +37,8 @@ export default {
   },
   join: {
     title: "Join a bill",
-    subtitle: "Enter the 6-character code the host shared with you.",
-    placeholder: "CODE",
+    subtitle: "Enter the 4-digit code the host shared with you.",
+    placeholder: "0000",
     joinBtn: "Join",
     joining: "Joining…",
     notFound: "No session found for that code",

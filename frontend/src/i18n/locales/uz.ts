@@ -37,8 +37,8 @@ export default {
   },
   join: {
     title: "Hisobga qo'shilish",
-    subtitle: "Host ulashgan 6 belgili code'ni kiriting.",
-    placeholder: "CODE",
+    subtitle: "Host ulashgan 4 xonali kodni kiriting.",
+    placeholder: "0000",
     joinBtn: "Qo'shilish",
     joining: "Qo'shilmoqda…",
     notFound: "Bu code bo'yicha sessiya topilmadi",

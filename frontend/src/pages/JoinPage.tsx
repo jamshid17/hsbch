@@ -3,19 +3,23 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { api } from "../api";
 
+const CODE_LEN = 4;
+
 export default function JoinPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [params] = useSearchParams();
 
-  const [code, setCode] = useState((params.get("code") || "").toUpperCase());
+  const [code, setCode] = useState(
+    (params.get("code") || "").replace(/\D/g, "").slice(0, CODE_LEN)
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const autoTried = useRef(false);
 
   async function join(rawCode: string) {
-    const c = rawCode.trim().toUpperCase();
-    if (c.length < 4) return;
+    const c = rawCode.replace(/\D/g, "");
+    if (c.length !== CODE_LEN) return;
     setLoading(true);
     setError("");
     try {
@@ -45,17 +49,19 @@ export default function JoinPage() {
 
       <input
         type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
         value={code}
-        onChange={(e) => setCode(e.target.value.toUpperCase())}
+        onChange={(e) =>
+          setCode(e.target.value.replace(/\D/g, "").slice(0, CODE_LEN))
+        }
         placeholder={t("join.placeholder")}
-        maxLength={8}
-        autoCapitalize="characters"
+        maxLength={CODE_LEN}
         style={{
-          fontSize: 28,
-          letterSpacing: 6,
+          fontSize: 32,
+          letterSpacing: 12,
           textAlign: "center",
           fontWeight: 700,
-          textTransform: "uppercase",
         }}
       />
 
@@ -63,7 +69,7 @@ export default function JoinPage() {
 
       <button
         className="btn"
-        disabled={loading || code.trim().length < 4}
+        disabled={loading || code.length !== CODE_LEN}
         onClick={() => join(code)}
       >
         {loading ? t("join.joining") : t("join.joinBtn")}
