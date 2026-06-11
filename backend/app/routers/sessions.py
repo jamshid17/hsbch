@@ -19,13 +19,14 @@ from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
-_CODE_ALPHABET = string.ascii_uppercase + string.digits
+_CODE_ALPHABET = string.digits
+_CODE_LEN = 4
 
 
 def _generate_code(db: Session) -> str:
-    """Return a 6-char code that is not yet used by any session."""
-    for _ in range(20):
-        code = "".join(secrets.choice(_CODE_ALPHABET) for _ in range(6))
+    """Return a 4-digit numeric code that is not yet used by any session."""
+    for _ in range(50):
+        code = "".join(secrets.choice(_CODE_ALPHABET) for _ in range(_CODE_LEN))
         exists = db.execute(
             select(SessionModel.id).where(SessionModel.code == code)
         ).first()
