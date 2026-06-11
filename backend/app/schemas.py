@@ -4,6 +4,13 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 
+# Auth
+class AuthUser(BaseModel):
+    id: int
+    first_name: str
+    username: str | None = None
+
+
 # Session
 class SessionOut(BaseModel):
     id: uuid.UUID

@@ -503,3 +503,17 @@ input:focus {
   z-index: 6;
   pointer-events: none;
 }
+
+/* Auth gate spinner */
+.auth-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--secondary-bg);
+  border-top-color: var(--button);
+  border-radius: 50%;
+  animation: auth-spin 0.8s linear infinite;
+}
+
+@keyframes auth-spin {
+  to { transform: rotate(360deg); }
+}

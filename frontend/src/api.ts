@@ -1,4 +1,5 @@
 import { authHeaders } from "./telegram";
+import type { TelegramAuthUser } from "./types/auth";
 
 const BASE = "/api";
 
@@ -82,6 +83,11 @@ export interface ScanResult {
 }
 
 export const api = {
+  // Validates the Telegram initData (sent via the X-Telegram-Init-Data header
+  // by authHeaders()) and returns the authenticated user.
+  authTelegram: () =>
+    request<TelegramAuthUser>("/auth/telegram", { method: "POST" }),
+
   createSession: () =>
     request<SessionOut>("/sessions", { method: "POST" }),
 
