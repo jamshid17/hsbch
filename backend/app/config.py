@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     postgres_password: str
     postgres_db: str
 
+    # When true, accept an X-Telegram-User-Id header without initData validation.
+    # For local development / browser testing only. Never enable in production.
+    dev_allow_unsafe: bool = False
+
     class Config:
         env_file = ".env"
         extra = "ignore"

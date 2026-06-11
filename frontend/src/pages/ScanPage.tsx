@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { api } from "../api";
-import { getTelegramUser } from "../telegram";
 
 export default function ScanPage() {
   const { t } = useTranslation();
@@ -26,8 +25,7 @@ export default function ScanPage() {
     setLoading(true);
     setError("");
     try {
-      const { chatId } = getTelegramUser();
-      const session = await api.createSession(chatId);
+      const session = await api.createSession();
       await api.uploadReceipt(session.id, file);
       navigate(`/edit/${session.id}`);
     } catch (e: unknown) {

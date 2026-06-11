@@ -5,12 +5,9 @@ from pydantic import BaseModel
 
 
 # Session
-class SessionCreate(BaseModel):
-    telegram_chat_id: int
-
-
 class SessionOut(BaseModel):
     id: uuid.UUID
+    code: str
     telegram_chat_id: int
     currency: str
     tax: Decimal
@@ -41,29 +38,36 @@ class ItemsUpdate(BaseModel):
     tip: Decimal = Decimal("0")
 
 
-# People
-class PersonIn(BaseModel):
-    name: str
-
-
-class PersonOut(PersonIn):
+# People / participants
+class PersonOut(BaseModel):
     id: uuid.UUID
+    name: str
+    telegram_user_id: int | None = None
 
     model_config = {"from_attributes": True}
 
 
-class PeopleUpdate(BaseModel):
-    people: list[PersonIn]
-
-
-# Assignments
-class AssignmentIn(BaseModel):
+class PickOut(BaseModel):
     item_id: uuid.UUID
-    person_ids: list[uuid.UUID]
+    quantity: Decimal
 
 
-class AssignmentsUpdate(BaseModel):
-    assignments: list[AssignmentIn]
+class ParticipantOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    telegram_user_id: int | None = None
+    is_host: bool = False
+    picks: list[PickOut] = []
+
+
+# My selections (per-user assignment submit)
+class MyPick(BaseModel):
+    item_id: uuid.UUID
+    quantity: Decimal = Decimal("1")
+
+
+class MyAssignmentsUpdate(BaseModel):
+    picks: list[MyPick]
 
 
 # Summary
