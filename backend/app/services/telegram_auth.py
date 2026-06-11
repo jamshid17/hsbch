@@ -3,18 +3,28 @@
 See https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
 """
 
+import base64
 import hashlib
 import hmac
 import json
 import logging
 from dataclasses import dataclass
-from urllib.parse import unquote, unquote_plus
+from urllib.parse import parse_qsl, unquote, unquote_plus
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import Header, HTTPException
 
 from app.config import settings
 
 logger = logging.getLogger("telegram_auth")
+
+# Telegram's Ed25519 public keys for third-party initData signature validation.
+# https://core.telegram.org/bots/webapps#validating-data-for-third-party-use
+_TG_PUBLIC_KEYS = {
+    "prod": "e7bf03a2fa4602af4580703d88dda5bb59f32ed8b02a56c187fe7d34caed242d",
+    "test": "40055058a4ee38156a06562e52eece92a771bcd8346a8c4615cb7376eddf72ec",
+}
 
 
 @dataclass
@@ -85,33 +95,78 @@ def _candidates(init_data: str):
             yield label, dict(selected), dcs
 
 
-def _verify_init_data(init_data: str) -> dict:
-    """Verify the HMAC of a raw initData string and return its decoded fields.
+def _b64url_decode(value: str) -> bytes:
+    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
 
-    Tries every reasonable interpretation and accepts the first that matches
-    Telegram's hash, so it is robust to in-transit decoding differences.
-    Raises HTTPException(401) if none match.
+
+def _verify_signature(init_data: str) -> bool:
+    """Verify the Ed25519 `signature` field with Telegram's public key.
+
+    This is token-independent (uses Telegram's global key + the bot id), so it
+    succeeds even when the HMAC `hash` can't be matched against our bot token.
+    """
+    decoded = dict(parse_qsl(init_data))
+    signature = decoded.get("signature")
+    if not signature:
+        return False
+
+    bot_id = settings.bot_token.split(":")[0]
+    data_check_string = "\n".join(
+        f"{k}={v}"
+        for k, v in sorted(decoded.items())
+        if k not in ("hash", "signature")
+    )
+    message = f"{bot_id}:WebAppData\n{data_check_string}".encode()
+
+    try:
+        sig = _b64url_decode(signature)
+    except (ValueError, base64.binascii.Error):
+        return False
+
+    for key_hex in _TG_PUBLIC_KEYS.values():
+        try:
+            Ed25519PublicKey.from_public_bytes(bytes.fromhex(key_hex)).verify(
+                sig, message
+            )
+            return True
+        except InvalidSignature:
+            continue
+    return False
+
+
+def _verify_init_data(init_data: str) -> dict:
+    """Validate a raw initData string and return its decoded fields.
+
+    Accepts the data if EITHER the HMAC `hash` matches our bot token (under any
+    reasonable decoding) OR Telegram's Ed25519 `signature` verifies. Raises
+    HTTPException(401) otherwise.
     """
     received_hash = dict(_split_pairs(init_data)).get("hash")
-    if not received_hash:
-        raise HTTPException(401, "Missing initData hash")
 
     attempts: dict[str, str] = {}
-    for label, decoded_dict, dcs in _candidates(init_data):
-        computed = _hash_of(dcs)
-        attempts[label] = computed[:8]
-        if hmac.compare_digest(computed, received_hash):
-            logger.info("initData matched variant %s", label)
-            return decoded_dict
+    if received_hash:
+        for label, decoded_dict, dcs in _candidates(init_data):
+            computed = _hash_of(dcs)
+            attempts[label] = computed[:8]
+            if hmac.compare_digest(computed, received_hash):
+                logger.info("initData matched HMAC variant %s", label)
+                return decoded_dict
+
+    # Token-independent fallback: Telegram's Ed25519 signature.
+    if _verify_signature(init_data):
+        logger.info("initData matched Ed25519 signature")
+        return dict(parse_qsl(init_data))
 
     # TEMPORARY diagnostics (token fingerprint only, plus the user's own
     # initData) to debug remaining signature failures. Remove once resolved.
     debug = {
         "error": "Invalid initData signature",
-        "recv": received_hash[:8],
+        "recv": (received_hash or "")[:8],
         "attempts": attempts,
+        "sig_present": "signature" in dict(_split_pairs(init_data)),
+        "bot_id": settings.bot_token.split(":")[0],
         "token_fp": hashlib.sha256(settings.bot_token.encode()).hexdigest()[:10],
-        "raw": init_data[:500],
+        "raw": init_data[:600],
     }
     logger.warning("initData mismatch: %s", debug)
     raise HTTPException(401, debug)

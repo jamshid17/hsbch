@@ -9,5 +9,6 @@ pydantic
 pydantic-settings
 anthropic
 aiogram
+cryptography
 python-multipart
 httpx
