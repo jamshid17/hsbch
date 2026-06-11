@@ -42,6 +42,7 @@ export default function App() {
   return (
     <>
       <div className="top-bar">
+        <span className="app-version">v{import.meta.env.VITE_APP_VERSION ?? "dev"}</span>
         <ProgressSteps />
         <LanguageSwitcher />
       </div>

@@ -490,3 +490,16 @@ input:focus {
   font-weight: 700;
   font-size: 16px;
 }
+
+/* Deploy version badge — top-right of the sticky navbar */
+.app-version {
+  position: absolute;
+  top: 5px;
+  right: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--hint);
+  opacity: 0.7;
+  z-index: 6;
+  pointer-events: none;
+}
