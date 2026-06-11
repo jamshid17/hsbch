@@ -8,7 +8,7 @@ import hmac
 import json
 import logging
 from dataclasses import dataclass
-from urllib.parse import parse_qsl
+from urllib.parse import unquote, unquote_plus
 
 from fastapi import Header, HTTPException
 
@@ -28,51 +28,93 @@ class TelegramUser:
         return self.first_name or self.username or f"User {self.id}"
 
 
-def _hmac_hash(pairs: dict) -> str:
-    data_check_string = "\n".join(f"{k}={pairs[k]}" for k in sorted(pairs))
-    secret_key = hmac.new(
+def _secret_key() -> bytes:
+    return hmac.new(
         b"WebAppData", settings.bot_token.encode(), hashlib.sha256
     ).digest()
+
+
+def _hash_of(data_check_string: str) -> str:
     return hmac.new(
-        secret_key, data_check_string.encode(), hashlib.sha256
+        _secret_key(), data_check_string.encode(), hashlib.sha256
     ).hexdigest()
 
 
-def _verify_init_data(init_data: str) -> dict:
-    """Verify the HMAC of a raw initData string and return its parsed fields.
+def _split_pairs(init_data: str) -> list[tuple[str, str]]:
+    """Split a query string into (key, raw_value) pairs without decoding."""
+    pairs = []
+    for part in init_data.split("&"):
+        if not part:
+            continue
+        key, _, value = part.partition("=")
+        pairs.append((key, value))
+    return pairs
 
-    Raises HTTPException(401) if the signature is missing or invalid.
+
+# Different ways a value might need to be interpreted. The correct one depends
+# on how many times the initData was URL-decoded before reaching us: normally
+# it arrives encoded and Telegram signed the once-decoded values ("plus"), but
+# if a proxy decoded it in transit the values are already decoded ("raw").
+_DECODERS = {
+    "plus": unquote_plus,
+    "unquote": unquote,
+    "raw": lambda v: v,
+}
+
+
+def _candidates(init_data: str):
+    """Yield (label, decoded_dict, data_check_string) for each interpretation.
+
+    Telegram's `hash` is computed over the fields (sorted by key, excluding
+    `hash`) joined by '\\n'. Modern clients add an Ed25519 `signature` field;
+    some constructions include it in the hash, some don't — try both.
     """
-    pairs = dict(parse_qsl(init_data, keep_blank_values=True))
-    received_hash = pairs.pop("hash", None)
+    raw_pairs = _split_pairs(init_data)
+    for dname, decode in _DECODERS.items():
+        decoded = [(k, decode(v)) for k, v in raw_pairs if k != "hash"]
+        for include_sig in (True, False):
+            selected = (
+                decoded
+                if include_sig
+                else [(k, v) for k, v in decoded if k != "signature"]
+            )
+            dcs = "\n".join(
+                f"{k}={v}" for k, v in sorted(selected, key=lambda p: p[0])
+            )
+            label = f"{dname}/{'sig' if include_sig else 'nosig'}"
+            yield label, dict(selected), dcs
+
+
+def _verify_init_data(init_data: str) -> dict:
+    """Verify the HMAC of a raw initData string and return its decoded fields.
+
+    Tries every reasonable interpretation and accepts the first that matches
+    Telegram's hash, so it is robust to in-transit decoding differences.
+    Raises HTTPException(401) if none match.
+    """
+    received_hash = dict(_split_pairs(init_data)).get("hash")
     if not received_hash:
         raise HTTPException(401, "Missing initData hash")
 
-    # Modern initData also carries an Ed25519 `signature` field for third-party
-    # validation. Telegram computes `hash` over the fields excluding both `hash`
-    # and `signature`, but older clients omit `signature` entirely. Accept the
-    # data if either interpretation matches so we work across client versions.
-    without_sig = {k: v for k, v in pairs.items() if k != "signature"}
-    calc_with_sig = _hmac_hash(pairs)
-    calc_without_sig = _hmac_hash(without_sig)
+    attempts: dict[str, str] = {}
+    for label, decoded_dict, dcs in _candidates(init_data):
+        computed = _hash_of(dcs)
+        attempts[label] = computed[:8]
+        if hmac.compare_digest(computed, received_hash):
+            logger.info("initData matched variant %s", label)
+            return decoded_dict
 
-    if received_hash not in {calc_with_sig, calc_without_sig}:
-        # TEMPORARY diagnostics (no secrets — only a token fingerprint) to debug
-        # signature failures on the deployed server. Remove once resolved.
-        token_fp = hashlib.sha256(settings.bot_token.encode()).hexdigest()[:10]
-        debug = {
-            "error": "Invalid initData signature",
-            "keys": sorted(pairs),
-            "has_signature": "signature" in pairs,
-            "recv": received_hash[:8],
-            "calc_with_sig": calc_with_sig[:8],
-            "calc_without_sig": calc_without_sig[:8],
-            "token_fp": token_fp,
-        }
-        logger.warning("initData signature mismatch: %s", debug)
-        raise HTTPException(401, debug)
-
-    return pairs
+    # TEMPORARY diagnostics (token fingerprint only, plus the user's own
+    # initData) to debug remaining signature failures. Remove once resolved.
+    debug = {
+        "error": "Invalid initData signature",
+        "recv": received_hash[:8],
+        "attempts": attempts,
+        "token_fp": hashlib.sha256(settings.bot_token.encode()).hexdigest()[:10],
+        "raw": init_data[:500],
+    }
+    logger.warning("initData mismatch: %s", debug)
+    raise HTTPException(401, debug)
 
 
 def _user_from_fields(pairs: dict) -> TelegramUser:
