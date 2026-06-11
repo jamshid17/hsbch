@@ -22,7 +22,7 @@ class Session(Base):
         UUID(as_uuid=True), primary_key=True, default=_uuid
     )
     telegram_chat_id: Mapped[int] = mapped_column(
-        BigInteger, nullable=False, unique=True
+        BigInteger, nullable=False
     )
     currency: Mapped[str] = mapped_column(String(10), nullable=False, default="")
     tax: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
