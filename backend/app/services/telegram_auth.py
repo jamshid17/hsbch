@@ -53,16 +53,24 @@ def _verify_init_data(init_data: str) -> dict:
     # and `signature`, but older clients omit `signature` entirely. Accept the
     # data if either interpretation matches so we work across client versions.
     without_sig = {k: v for k, v in pairs.items() if k != "signature"}
-    candidates = {_hmac_hash(pairs), _hmac_hash(without_sig)}
+    calc_with_sig = _hmac_hash(pairs)
+    calc_without_sig = _hmac_hash(without_sig)
 
-    if received_hash not in candidates:
-        logger.warning(
-            "initData signature mismatch: keys=%s received=%s computed=%s",
-            sorted(pairs),
-            received_hash,
-            candidates,
-        )
-        raise HTTPException(401, "Invalid initData signature")
+    if received_hash not in {calc_with_sig, calc_without_sig}:
+        # TEMPORARY diagnostics (no secrets — only a token fingerprint) to debug
+        # signature failures on the deployed server. Remove once resolved.
+        token_fp = hashlib.sha256(settings.bot_token.encode()).hexdigest()[:10]
+        debug = {
+            "error": "Invalid initData signature",
+            "keys": sorted(pairs),
+            "has_signature": "signature" in pairs,
+            "recv": received_hash[:8],
+            "calc_with_sig": calc_with_sig[:8],
+            "calc_without_sig": calc_without_sig[:8],
+            "token_fp": token_fp,
+        }
+        logger.warning("initData signature mismatch: %s", debug)
+        raise HTTPException(401, debug)
 
     return pairs
 
