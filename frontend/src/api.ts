@@ -1,9 +1,19 @@
+import { authHeaders } from "./telegram";
+
 const BASE = "/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // For FormData (file upload) we must NOT set Content-Type — the browser sets
+  // it together with the multipart boundary. Forcing application/json there
+  // strips the boundary and the server sees no file.
+  const isForm = init?.body instanceof FormData;
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...init?.headers },
     ...init,
+    headers: {
+      ...(isForm ? {} : { "Content-Type": "application/json" }),
+      ...authHeaders(),
+      ...init?.headers,
+    },
   });
   if (!res.ok) {
     const text = await res.text();
@@ -15,6 +25,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export interface SessionOut {
   id: string;
+  code: string;
+  telegram_chat_id: number;
   currency: string;
   tax: string;
   tip: string;
@@ -32,6 +44,20 @@ export interface ItemOut {
 export interface PersonOut {
   id: string;
   name: string;
+  telegram_user_id: number | null;
+}
+
+export interface Pick {
+  item_id: string;
+  quantity: string;
+}
+
+export interface ParticipantOut {
+  id: string;
+  name: string;
+  telegram_user_id: number | null;
+  is_host: boolean;
+  picks: Pick[];
 }
 
 export interface PersonSummary {
@@ -56,18 +82,23 @@ export interface ScanResult {
 }
 
 export const api = {
-  createSession: (telegram_chat_id: number) =>
-    request<SessionOut>("/sessions", {
-      method: "POST",
-      body: JSON.stringify({ telegram_chat_id }),
-    }),
+  createSession: () =>
+    request<SessionOut>("/sessions", { method: "POST" }),
+
+  getSession: (sessionId: string) =>
+    request<SessionOut>(`/sessions/${sessionId}`),
+
+  getSessionByCode: (code: string) =>
+    request<SessionOut>(`/sessions/by-code/${code}`),
+
+  joinSession: (sessionId: string) =>
+    request<PersonOut>(`/sessions/${sessionId}/join`, { method: "POST" }),
 
   uploadReceipt: (sessionId: string, file: File) => {
     const form = new FormData();
     form.append("file", file);
     return request<ScanResult>(`/sessions/${sessionId}/receipt`, {
       method: "POST",
-      headers: {},
       body: form,
     });
   },
@@ -84,29 +115,20 @@ export const api = {
   listItems: (sessionId: string) =>
     request<ItemOut[]>(`/sessions/${sessionId}/items`),
 
-  addPerson: (sessionId: string, name: string) =>
-    request<PersonOut>(`/sessions/${sessionId}/people`, {
-      method: "POST",
-      body: JSON.stringify({ name }),
-    }),
+  listParticipants: (sessionId: string) =>
+    request<ParticipantOut[]>(`/sessions/${sessionId}/participants`),
 
-  updatePeople: (sessionId: string, people: { name: string }[]) =>
-    request<PersonOut[]>(`/sessions/${sessionId}/people`, {
-      method: "PUT",
-      body: JSON.stringify({ people }),
-    }),
-
-  listPeople: (sessionId: string) =>
-    request<PersonOut[]>(`/sessions/${sessionId}/people`),
-
-  updateAssignments: (
+  saveMyAssignments: (
     sessionId: string,
-    assignments: { item_id: string; person_ids: string[] }[]
+    picks: { item_id: string; quantity: string }[]
   ) =>
-    request<void>(`/sessions/${sessionId}/assignments`, {
+    request<Pick[]>(`/sessions/${sessionId}/my-assignments`, {
       method: "PUT",
-      body: JSON.stringify({ assignments }),
+      body: JSON.stringify({ picks }),
     }),
+
+  finalizeSession: (sessionId: string) =>
+    request<SessionOut>(`/sessions/${sessionId}/finalize`, { method: "POST" }),
 
   getSummary: (sessionId: string) =>
     request<SummaryOut>(`/sessions/${sessionId}/summary`),

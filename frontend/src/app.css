@@ -454,3 +454,39 @@ input:focus {
   z-index: 20;
   pointer-events: none;
 }
+
+/* ── Pick page: selected card + quantity stepper ── */
+.card-selected {
+  outline: 2px solid var(--button);
+  outline-offset: -2px;
+}
+
+.qty-stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.qty-stepper button {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: var(--button);
+  color: var(--button-text);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qty-stepper span {
+  min-width: 20px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 16px;
+}

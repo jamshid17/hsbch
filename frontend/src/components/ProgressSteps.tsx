@@ -6,11 +6,11 @@ export default function ProgressSteps() {
   const { pathname } = useLocation();
   const { t } = useTranslation();
 
+  // Host flow only. Entry / join / pick screens show no step bar.
   const STEPS = [
-    { label: t("steps.scan"),    pattern: /^\/$/ },
-    { label: t("steps.items"),   pattern: /^\/edit\// },
-    { label: t("steps.people"),  pattern: /^\/people\// },
-    { label: t("steps.assign"),  pattern: /^\/assign\// },
+    { label: t("steps.scan"), pattern: /^\/scan/ },
+    { label: t("steps.items"), pattern: /^\/edit\// },
+    { label: t("steps.collect"), pattern: /^\/host\// },
     { label: t("steps.summary"), pattern: /^\/summary\// },
   ];
 

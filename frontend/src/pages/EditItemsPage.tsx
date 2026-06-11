@@ -58,7 +58,7 @@ export default function EditItemsPage() {
         items: items.map((i) => ({ name: i.name, price: i.price, quantity: i.quantity, unit: i.unit })),
         currency, tax, tip,
       }),
-    onSuccess: () => navigate(`/people/${sessionId}`),
+    onSuccess: () => navigate(`/host/${sessionId}`),
     onError: (e: unknown) => setError(e instanceof Error ? e.message : t("edit.failedSave")),
   });
 
