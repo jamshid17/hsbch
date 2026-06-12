@@ -96,7 +96,7 @@ export default function HostLivePage() {
         >
           {code || "······"}
         </div>
-        <div className="row" style={{ gap: 8, width: "100%" }}>
+        <div className="row" style={{ gap: 8, width: "100%", alignItems: "stretch" }}>
           <button className="btn btn-ghost" style={{ flex: 1, margin: 0 }} onClick={copyCode}>
             {copied ? t("host.copied") : t("host.copy")}
           </button>
