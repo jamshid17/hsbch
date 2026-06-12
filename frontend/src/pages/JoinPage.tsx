@@ -24,6 +24,11 @@ export default function JoinPage() {
     setError("");
     try {
       const session = await api.getSessionByCode(c);
+      // A finished bill: just show the result, don't (re)join to pick items.
+      if (session.status === "done") {
+        navigate(`/summary/${session.id}`, { replace: true });
+        return;
+      }
       await api.joinSession(session.id);
       navigate(`/pick/${session.id}`, { replace: true });
     } catch {
