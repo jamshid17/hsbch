@@ -20,6 +20,86 @@ function emptyItem(): EditableItem {
   return { name: "", price: "", quantity: "1", unit: "pcs" };
 }
 
+/** Tax/tip input that can be entered as a fixed amount or as a % of subtotal. */
+function AmountPercentField({
+  label,
+  amountLabel,
+  mode,
+  onMode,
+  amount,
+  onAmount,
+  pct,
+  onPct,
+  computed,
+  currency,
+}: {
+  label: string;
+  amountLabel: string;
+  mode: "amount" | "pct";
+  onMode: (m: "amount" | "pct") => void;
+  amount: string;
+  onAmount: (v: string) => void;
+  pct: string;
+  onPct: (v: string) => void;
+  computed: number;
+  currency: string;
+}) {
+  return (
+    <div>
+      <div
+        className="row"
+        style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}
+      >
+        <div className="label" style={{ margin: 0 }}>{label}</div>
+        <div className="seg">
+          <button
+            type="button"
+            className={mode === "amount" ? "seg-btn active" : "seg-btn"}
+            onClick={() => onMode("amount")}
+          >
+            {amountLabel}
+          </button>
+          <button
+            type="button"
+            className={mode === "pct" ? "seg-btn active" : "seg-btn"}
+            onClick={() => onMode("pct")}
+          >
+            %
+          </button>
+        </div>
+      </div>
+
+      {mode === "amount" ? (
+        <input
+          type="number"
+          inputMode="decimal"
+          value={amount}
+          onChange={(e) => onAmount(e.target.value)}
+          placeholder="0.00"
+          min="0"
+          step="0.01"
+        />
+      ) : (
+        <>
+          <input
+            type="number"
+            inputMode="decimal"
+            value={pct}
+            onChange={(e) => onPct(e.target.value)}
+            placeholder="12"
+            min="0"
+            step="0.1"
+          />
+          <div style={{ color: "var(--hint)", fontSize: 13, marginTop: 6 }}>
+            = {currency}
+            {computed.toFixed(2)}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function EditItemsPage() {
   const { t } = useTranslation();
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -29,6 +109,10 @@ export default function EditItemsPage() {
   const [currency, setCurrency] = useState("");
   const [tax, setTax] = useState("0");
   const [tip, setTip] = useState("0");
+  const [taxMode, setTaxMode] = useState<"amount" | "pct">("amount");
+  const [tipMode, setTipMode] = useState<"amount" | "pct">("amount");
+  const [taxPct, setTaxPct] = useState("");
+  const [tipPct, setTipPct] = useState("");
   const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState("");
 
@@ -52,11 +136,22 @@ export default function EditItemsPage() {
     setInitialized(true);
   }, [data, initialized]);
 
+  const subtotal = items.reduce(
+    (sum, i) => sum + (parseFloat(i.price) || 0) * (parseFloat(i.quantity) || 0),
+    0
+  );
+  const effectiveTax =
+    taxMode === "pct" ? (subtotal * (parseFloat(taxPct) || 0)) / 100 : parseFloat(tax) || 0;
+  const effectiveTip =
+    tipMode === "pct" ? (subtotal * (parseFloat(tipPct) || 0)) / 100 : parseFloat(tip) || 0;
+
   const saveMutation = useMutation({
     mutationFn: () =>
       api.updateItems(sessionId!, {
         items: items.map((i) => ({ name: i.name, price: i.price, quantity: i.quantity, unit: i.unit })),
-        currency, tax, tip,
+        currency,
+        tax: effectiveTax.toFixed(2),
+        tip: effectiveTip.toFixed(2),
       }),
     onSuccess: () => navigate(`/host/${sessionId}`),
     onError: (e: unknown) => setError(e instanceof Error ? e.message : t("edit.failedSave")),
@@ -117,20 +212,36 @@ export default function EditItemsPage() {
       <button className="btn btn-ghost" onClick={addItem}>{t("edit.addItem")}</button>
 
       <div className="card">
-        <div className="row">
-          <div style={{ flex: 1 }}>
-            <div className="label">{t("edit.currency")}</div>
-            <input type="text" value={currency} onChange={(e) => setCurrency(e.target.value)} placeholder="$" />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div className="label">{t("edit.tax")}</div>
-            <input type="number" value={tax} onChange={(e) => setTax(e.target.value)} placeholder="0.00" min="0" step="0.01" />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div className="label">{t("edit.tip")}</div>
-            <input type="number" value={tip} onChange={(e) => setTip(e.target.value)} placeholder="0.00" min="0" step="0.01" />
-          </div>
+        <div>
+          <div className="label">{t("edit.currency")}</div>
+          <input type="text" value={currency} onChange={(e) => setCurrency(e.target.value)} placeholder="$" />
         </div>
+
+        <AmountPercentField
+          label={t("edit.tax")}
+          amountLabel={t("edit.modeAmount")}
+          mode={taxMode}
+          onMode={setTaxMode}
+          amount={tax}
+          onAmount={setTax}
+          pct={taxPct}
+          onPct={setTaxPct}
+          computed={effectiveTax}
+          currency={currency}
+        />
+
+        <AmountPercentField
+          label={t("edit.tip")}
+          amountLabel={t("edit.modeAmount")}
+          mode={tipMode}
+          onMode={setTipMode}
+          amount={tip}
+          onAmount={setTip}
+          pct={tipPct}
+          onPct={setTipPct}
+          computed={effectiveTip}
+          currency={currency}
+        />
       </div>
 
       {error && <p className="error">{error}</p>}

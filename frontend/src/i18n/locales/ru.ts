@@ -38,6 +38,7 @@ export default {
     currency: "Валюта",
     tax: "Налог",
     tip: "Чаевые",
+    modeAmount: "Сумма",
     addItem: "+ Добавить позицию",
     next: "Открыть сессию →",
     saving: "Сохранение…",

@@ -628,3 +628,26 @@ input:focus {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(0.92); opacity: 0.7; }
 }
+
+/* Segmented amount/percent toggle (tax & tip) */
+.seg {
+  display: inline-flex;
+  background: var(--secondary-bg);
+  border-radius: 9px;
+  padding: 3px;
+  gap: 3px;
+}
+.seg-btn {
+  border: none;
+  background: transparent;
+  color: var(--hint);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.seg-btn.active {
+  background: var(--button);
+  color: var(--button-text);
+}

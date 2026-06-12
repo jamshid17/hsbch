@@ -38,6 +38,7 @@ export default {
     currency: "Currency",
     tax: "Tax",
     tip: "Tip",
+    modeAmount: "Amount",
     addItem: "+ Add item",
     next: "Open session →",
     saving: "Saving…",

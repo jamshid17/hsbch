@@ -38,6 +38,7 @@ export default {
     currency: "Valyuta",
     tax: "Soliq",
     tip: "Tip",
+    modeAmount: "Summa",
     addItem: "+ Mahsulot qo'shish",
     next: "Sessiyani ochish →",
     saving: "Saqlanmoqda…",
