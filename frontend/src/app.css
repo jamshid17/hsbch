@@ -651,3 +651,8 @@ input:focus {
   background: var(--button);
   color: var(--button-text);
 }
+
+.qty-stepper button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

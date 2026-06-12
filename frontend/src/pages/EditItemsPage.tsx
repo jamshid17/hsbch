@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, ItemOut } from "../api";
 import Skeleton from "../components/Skeleton";
+import { clampQty, fmtQty, MAX_QTY } from "../lib/format";
 
 interface EditableItem {
   id?: string;
@@ -129,7 +130,7 @@ export default function EditItemsPage() {
 
   useEffect(() => {
     if (!data || initialized) return;
-    setItems(data.rawItems.map((i) => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity, unit: i.unit })));
+    setItems(data.rawItems.map((i) => ({ id: i.id, name: i.name, price: i.price, quantity: clampQty(fmtQty(i.quantity)), unit: i.unit })));
     setCurrency(data.session.currency ?? "");
     setTax(data.session.tax ?? "0");
     setTip(data.session.tip ?? "0");
@@ -158,7 +159,8 @@ export default function EditItemsPage() {
   });
 
   function updateItem(idx: number, field: keyof EditableItem, value: string) {
-    setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, [field]: value } : item)));
+    const v = field === "quantity" ? clampQty(value) : value;
+    setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, [field]: v } : item)));
   }
   function addItem() { setItems((prev) => [...prev, emptyItem()]); }
   function removeItem(idx: number) { setItems((prev) => prev.filter((_, i) => i !== idx)); }
@@ -198,7 +200,7 @@ export default function EditItemsPage() {
               </div>
               <div style={{ flex: 1 }}>
                 <div className="label">{t("edit.qty")}</div>
-                <input type="number" value={item.quantity} onChange={(e) => updateItem(idx, "quantity", e.target.value)} placeholder="1" min="0" step="0.001" />
+                <input type="number" value={item.quantity} onChange={(e) => updateItem(idx, "quantity", e.target.value)} placeholder="1" min="0" max={MAX_QTY} step="0.001" />
               </div>
               <div style={{ flex: 1 }}>
                 <div className="label">{t("edit.unit")}</div>

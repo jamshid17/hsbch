@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 import { api, ItemOut, ParticipantOut } from "../api";
 import { getTelegramUser } from "../telegram";
+import { fmtQty, MAX_QTY } from "../lib/format";
 import Skeleton from "../components/Skeleton";
 
 function fmt(n: number): string {
@@ -97,7 +98,7 @@ export default function PickPage() {
     setSaved(false);
     setSel((prev) => {
       const cur = prev[itemId] || 0;
-      const nextQty = Math.max(1, cur + delta);
+      const nextQty = Math.min(MAX_QTY, Math.max(1, cur + delta));
       return { ...prev, [itemId]: nextQty };
     });
   }
@@ -152,15 +153,15 @@ export default function PickPage() {
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600 }}>{item.name}</div>
               <div style={{ color: "var(--hint)", fontSize: 13 }}>
-                {item.quantity} {item.unit} × {cur}
+                {fmtQty(item.quantity)} {item.unit} × {cur}
                 {fmt(parseFloat(item.price))}
               </div>
             </div>
             {selected && multi && (
               <div className="qty-stepper" onClick={(e) => e.stopPropagation()}>
-                <button onClick={(e) => step(item.id, -1, e)}>−</button>
+                <button onClick={(e) => step(item.id, -1, e)} disabled={qty <= 1}>−</button>
                 <span>{qty}</span>
-                <button onClick={(e) => step(item.id, 1, e)}>+</button>
+                <button onClick={(e) => step(item.id, 1, e)} disabled={qty >= MAX_QTY}>+</button>
               </div>
             )}
           </motion.div>
