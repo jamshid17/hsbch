@@ -61,7 +61,6 @@ export default function ScanPage() {
           ref={inputRef}
           type="file"
           accept="image/*"
-          capture="environment"
           onChange={onFileChange}
           style={{ display: "none" }}
         />
