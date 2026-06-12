@@ -517,3 +517,100 @@ input:focus {
 @keyframes auth-spin {
   to { transform: rotate(360deg); }
 }
+
+/* ── Landing page (browser, outside Telegram) ── */
+.landing {
+  max-width: 520px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 16px 20px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.landing-top {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.landing-hero {
+  text-align: center;
+  margin-top: 8vh;
+}
+
+.landing-logo {
+  font-size: 72px;
+  line-height: 1;
+}
+
+.landing-title {
+  font-size: 32px;
+  font-weight: 800;
+  margin: 16px 0 8px;
+}
+
+.landing-tagline {
+  color: var(--hint);
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0 auto;
+  max-width: 380px;
+}
+
+.landing-features {
+  width: 100%;
+  margin: 36px 0 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.landing-feature {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--secondary-bg);
+  border-radius: 14px;
+  padding: 16px 18px;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.landing-feature-icon {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.landing-cta {
+  width: 100%;
+  max-width: 360px;
+  background: #2aabee;
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 16px;
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(42, 171, 238, 0.35);
+}
+
+.landing-cta:active {
+  transform: scale(0.98);
+}
+
+.landing-note {
+  color: var(--hint);
+  font-size: 13px;
+  text-align: center;
+  margin-top: 16px;
+  max-width: 360px;
+}

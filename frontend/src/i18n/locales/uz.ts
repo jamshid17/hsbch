@@ -5,6 +5,15 @@ export default {
     collect: "Yig'ish",
     summary: "Xulosa",
   },
+  landing: {
+    title: "Hisob bo'luvchi",
+    tagline: "Restoran hisobini do'stlar bilan bo'ling — to'g'ridan-to'g'ri Telegram'da.",
+    feature1: "Chekni suratga oling — mahsulotlar avtomatik o'qiladi",
+    feature2: "Kod ulashing — hamma qo'shilib o'zi yegan taomni tanlaydi",
+    feature3: "Kim qancha to'lashini aniq ko'ring, soniyalarda adolatli bo'ling",
+    cta: "Telegram'da ochish",
+    note: "Bu — Telegram Mini App. Boshlash uchun uni Telegram ichida oching.",
+  },
   entry: {
     title: "Hisob bo'luvchi",
     subtitle: "Chekni skanerlab host bo'ling yoki do'stingiz hisobiga code bilan qo'shiling.",

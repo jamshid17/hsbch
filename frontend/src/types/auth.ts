@@ -11,6 +11,8 @@ export interface AuthState {
   isAuthenticated: boolean;
   user: TelegramAuthUser | null;
   error: string | null;
+  /** True when opened outside Telegram (plain browser) — show the landing page. */
+  notInTelegram: boolean;
 }
 
 /** Auth context value: state plus a manual retry. */

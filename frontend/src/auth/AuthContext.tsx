@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useTelegramAuth } from "./useTelegramAuth";
+import LandingPage from "../pages/LandingPage";
 import type { AuthContextValue } from "../types/auth";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -31,6 +32,11 @@ function GateScreen({ children }: { children: ReactNode }) {
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const auth = useTelegramAuth();
+
+  // Opened in a normal browser → marketing landing page with a link to the bot.
+  if (auth.notInTelegram) {
+    return <LandingPage />;
+  }
 
   if (auth.isLoading) {
     return (

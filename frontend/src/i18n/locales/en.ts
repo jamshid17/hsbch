@@ -5,6 +5,15 @@ export default {
     collect: "Collect",
     summary: "Summary",
   },
+  landing: {
+    title: "Bill Splitter",
+    tagline: "Split restaurant bills with friends — right inside Telegram.",
+    feature1: "Snap your receipt — items are recognized automatically",
+    feature2: "Share a code — everyone joins and picks what they ate",
+    feature3: "See exactly who owes what, split fairly in seconds",
+    cta: "Open in Telegram",
+    note: "This is a Telegram Mini App. Open it inside Telegram to start splitting.",
+  },
   entry: {
     title: "Bill Splitter",
     subtitle: "Scan a receipt to host, or join a friend's bill with a code.",

@@ -8,6 +8,7 @@ const INITIAL: AuthState = {
   isAuthenticated: false,
   user: null,
   error: null,
+  notInTelegram: false,
 };
 
 /**
@@ -37,17 +38,32 @@ export function useTelegramAuth(): AuthContextValue {
       // it is empty and the dev fallback (X-Telegram-User-Id) is used instead.
       const initData = getInitData();
       if (!initData && !import.meta.env.DEV) {
-        throw new Error("Not running inside Telegram");
+        // Opened in a normal browser — show the landing page, not an error.
+        setState({
+          isLoading: false,
+          isAuthenticated: false,
+          user: null,
+          error: null,
+          notInTelegram: true,
+        });
+        return;
       }
 
       const user = await api.authTelegram();
-      setState({ isLoading: false, isAuthenticated: true, user, error: null });
+      setState({
+        isLoading: false,
+        isAuthenticated: true,
+        user,
+        error: null,
+        notInTelegram: false,
+      });
     } catch (err) {
       setState({
         isLoading: false,
         isAuthenticated: false,
         user: null,
         error: err instanceof Error ? err.message : "Authentication failed",
+        notInTelegram: false,
       });
     }
   }, []);
