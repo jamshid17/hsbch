@@ -88,6 +88,9 @@ export const api = {
   authTelegram: () =>
     request<TelegramAuthUser>("/auth/telegram", { method: "POST" }),
 
+  getConfig: () =>
+    request<{ bot_username: string | null }>("/config"),
+
   createSession: () =>
     request<SessionOut>("/sessions", { method: "POST" }),
 

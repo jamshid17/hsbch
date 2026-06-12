@@ -57,6 +57,7 @@ export default {
   host: {
     title: "Live split",
     subtitle: "Share this code so others can join and pick their items.",
+    inviteText: "Let's split the bill — tap to join (code {{code}})",
     codeLabel: "Session code",
     copy: "Copy",
     copied: "✓ Copied",

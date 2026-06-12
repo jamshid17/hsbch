@@ -27,6 +27,12 @@ export default function HostLivePage() {
     queryFn: () => api.getSession(sessionId!),
   });
 
+  const { data: config } = useQuery({
+    queryKey: ["config"],
+    queryFn: () => api.getConfig(),
+    staleTime: Infinity,
+  });
+
   // Poll the live breakdown so the host sees picks as they come in.
   const { data: summary, isLoading } = useQuery<SummaryOut>({
     queryKey: ["live-summary", sessionId],
@@ -42,18 +48,27 @@ export default function HostLivePage() {
   const code = session?.code || "";
   const cur = summary?.currency || "";
 
+  // Deep link that opens the Mini App and auto-joins this session. Tapping it
+  // sets Telegram's start_param=<code>, which the app reads to jump to /join.
+  const inviteLink = config?.bot_username
+    ? `https://t.me/${config.bot_username}?startapp=${code}`
+    : `${window.location.origin}/?join=${code}`;
+
   async function shareCode() {
-    const link = `${window.location.origin}/?join=${code}`;
     if (tg.initData) {
-      tg.switchInlineQuery(code, ["users", "groups"]);
+      // Open Telegram's "share to chat" sheet with the clickable invite link.
+      const text = t("host.inviteText", { code });
+      tg.openTelegramLink(
+        `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`
+      );
       return;
     }
     try {
-      await navigator.clipboard.writeText(link);
+      await navigator.clipboard.writeText(inviteLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      window.alert(link);
+      window.alert(inviteLink);
     }
   }
 

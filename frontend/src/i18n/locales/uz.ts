@@ -57,6 +57,7 @@ export default {
   host: {
     title: "Jonli taqsimot",
     subtitle: "Boshqalar qo'shilib taom tanlashi uchun ushbu code'ni ulashing.",
+    inviteText: "Hisobni birga bo'lamiz! Qo'shilish uchun bosing (kod {{code}})",
     codeLabel: "Sessiya code'i",
     copy: "Nusxa",
     copied: "✓ Nusxalandi",
