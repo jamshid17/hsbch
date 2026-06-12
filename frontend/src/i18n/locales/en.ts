@@ -44,6 +44,7 @@ export default {
     saving: "Saving…",
     failedLoad: "Failed to load items",
     failedSave: "Failed to save",
+    needItem: "Add at least one item with a price. If this isn't a receipt, try a clearer photo.",
   },
   join: {
     title: "Join a bill",

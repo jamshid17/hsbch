@@ -44,6 +44,7 @@ export default {
     saving: "Saqlanmoqda…",
     failedLoad: "Mahsulotlarni yuklashda xato",
     failedSave: "Saqlashda xato",
+    needItem: "Kamida bitta mahsulot qo'shing (narxi bilan). Bu chek bo'lmasa, aniqroq rasm oling.",
   },
   join: {
     title: "Hisobga qo'shilish",

@@ -147,13 +147,30 @@ export default function EditItemsPage() {
     tipMode === "pct" ? (subtotal * (parseFloat(tipPct) || 0)) / 100 : parseFloat(tip) || 0;
 
   const saveMutation = useMutation({
-    mutationFn: () =>
-      api.updateItems(sessionId!, {
-        items: items.map((i) => ({ name: i.name, price: i.price, quantity: i.quantity, unit: i.unit })),
+    mutationFn: () => {
+      // Sanitize: coerce blank price/qty to valid numbers (avoids the backend
+      // decimal-parsing error) and drop empty junk rows (e.g. from scanning a
+      // non-receipt photo).
+      const cleanItems = items
+        .map((i) => ({
+          name: i.name.trim(),
+          price: i.price.trim() === "" ? "0" : i.price,
+          quantity: i.quantity.trim() === "" ? "1" : i.quantity,
+          unit: i.unit.trim() || "pcs",
+        }))
+        .filter((i) => i.name !== "" || parseFloat(i.price) > 0);
+
+      if (cleanItems.length === 0) {
+        return Promise.reject(new Error(t("edit.needItem")));
+      }
+
+      return api.updateItems(sessionId!, {
+        items: cleanItems,
         currency,
         tax: effectiveTax.toFixed(2),
         tip: effectiveTip.toFixed(2),
-      }),
+      });
+    },
     onSuccess: () => navigate(`/host/${sessionId}`),
     onError: (e: unknown) => setError(e instanceof Error ? e.message : t("edit.failedSave")),
   });
