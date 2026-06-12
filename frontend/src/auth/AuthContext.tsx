@@ -41,8 +41,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   if (auth.isLoading) {
     return (
       <GateScreen>
+        <img
+          src="/icon-512.png"
+          alt="Bill Splitter"
+          className="loading-logo"
+          width={92}
+          height={92}
+        />
         <div className="auth-spinner" aria-label="Loading" />
-        <p style={{ color: "var(--hint)" }}>Authenticating…</p>
       </GateScreen>
     );
   }
