@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { api } from "../api";
+import { downscaleImage } from "../lib/image";
 
 export default function ScanPage() {
   const { t } = useTranslation();
@@ -25,8 +26,9 @@ export default function ScanPage() {
     setLoading(true);
     setError("");
     try {
+      const image = await downscaleImage(file);
       const session = await api.createSession();
-      await api.uploadReceipt(session.id, file);
+      await api.uploadReceipt(session.id, image);
       navigate(`/edit/${session.id}`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t("scan.scanning"));
