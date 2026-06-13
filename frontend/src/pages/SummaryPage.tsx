@@ -40,7 +40,7 @@ export default function SummaryPage() {
       return;
     }
     const lines = summary.people.map((p) => `${p.name}: ${fmt(p.total)} ${summary.currency}`);
-    const text = `🧾 Bill split\n${lines.join("\n")}`;
+    const text = `🧾 ${summary.title || "Bill split"}\n${lines.join("\n")}`;
     if (navigator.share) {
       try { await navigator.share({ text }); return; } catch { /* cancelled */ }
     }
@@ -52,6 +52,7 @@ export default function SummaryPage() {
   }
 
   if (loading) return <div className="page"><h1>{t("summary.title")}</h1><Skeleton count={3} height={130} /></div>;
+
   if (error) return <div className="page"><p className="error">{error}</p></div>;
   if (!summary) return null;
 
@@ -59,7 +60,7 @@ export default function SummaryPage() {
 
   return (
     <div className="page">
-      <h1>{t("summary.title")}</h1>
+      <h1>{summary.title || t("summary.title")}</h1>
 
       {summary.people.map((person, i) => (
         <motion.div

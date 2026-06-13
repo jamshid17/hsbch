@@ -15,10 +15,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export interface SessionOut {
   id: string;
+  telegram_chat_id: number | null;
+  source: string;
   currency: string;
   tax: string;
   tip: string;
   status: string;
+  title?: string;
 }
 
 export interface ItemOut {
@@ -44,11 +47,13 @@ export interface PersonSummary {
 }
 
 export interface SummaryOut {
+  title: string;
   currency: string;
   people: PersonSummary[];
 }
 
 export interface ScanResult {
+  title: string;
   currency: string;
   tax: string;
   tip: string;
@@ -56,10 +61,10 @@ export interface ScanResult {
 }
 
 export const api = {
-  createSession: (telegram_chat_id: number) =>
+  createSession: (telegram_chat_id?: number) =>
     request<SessionOut>("/sessions", {
       method: "POST",
-      body: JSON.stringify({ telegram_chat_id }),
+      body: JSON.stringify({ telegram_chat_id: telegram_chat_id ?? null }),
     }),
 
   uploadReceipt: (sessionId: string, file: File) => {
@@ -110,4 +115,10 @@ export const api = {
 
   getSummary: (sessionId: string) =>
     request<SummaryOut>(`/sessions/${sessionId}/summary`),
+
+  updateSession: (sessionId: string, data: { title?: string }) =>
+    request<SessionOut>(`/sessions/${sessionId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
 };

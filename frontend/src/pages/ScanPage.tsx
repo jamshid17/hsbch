@@ -12,6 +12,7 @@ export default function ScanPage() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [scanned, setScanned] = useState<{ sessionId: string; title: string } | null>(null);
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -19,6 +20,7 @@ export default function ScanPage() {
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setError("");
+    setScanned(null);
   }
 
   async function handleScan() {
@@ -27,14 +29,20 @@ export default function ScanPage() {
     setError("");
     try {
       const { chatId } = getTelegramUser();
-      const session = await api.createSession(chatId);
-      await api.uploadReceipt(session.id, file);
-      navigate(`/edit/${session.id}`);
+      const session = await api.createSession(chatId > 0 ? chatId : undefined);
+      const result = await api.uploadReceipt(session.id, file);
+      setScanned({ sessionId: session.id, title: result.title });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t("scan.scanning"));
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleContinue() {
+    if (!scanned) return;
+    await api.updateSession(scanned.sessionId, { title: scanned.title });
+    navigate(`/edit/${scanned.sessionId}`);
   }
 
   return (
@@ -44,8 +52,8 @@ export default function ScanPage() {
 
       <div
         className="card"
-        style={{ alignItems: "center", minHeight: 200, justifyContent: "center", cursor: "pointer" }}
-        onClick={() => inputRef.current?.click()}
+        style={{ alignItems: "center", minHeight: 200, justifyContent: "center", cursor: scanned ? "default" : "pointer" }}
+        onClick={() => !scanned && inputRef.current?.click()}
       >
         {preview ? (
           <img
@@ -69,11 +77,29 @@ export default function ScanPage() {
         />
       </div>
 
+      {scanned && (
+        <div className="card" style={{ gap: 8 }}>
+          <div className="label">{t("scan.scannedAs")}</div>
+          <input
+            type="text"
+            value={scanned.title}
+            onChange={(e) => setScanned((s) => s ? { ...s, title: e.target.value } : s)}
+            style={{ fontWeight: 600, fontSize: 16 }}
+          />
+        </div>
+      )}
+
       {error && <p className="error">{error}</p>}
 
-      <button className="btn" disabled={!file || loading} onClick={handleScan}>
-        {loading ? t("scan.scanning") : t("scan.scanBtn")}
-      </button>
+      {scanned ? (
+        <button className="btn" onClick={handleContinue}>
+          {t("scan.continueBtn")}
+        </button>
+      ) : (
+        <button className="btn" disabled={!file || loading} onClick={handleScan}>
+          {loading ? t("scan.scanning") : t("scan.scanBtn")}
+        </button>
+      )}
     </div>
   );
 }

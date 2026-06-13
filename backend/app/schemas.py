@@ -1,23 +1,31 @@
 import uuid
 from decimal import Decimal
+from typing import Optional
 
+from app.enum import SourceEnum
 from pydantic import BaseModel
 
 
 # Session
 class SessionCreate(BaseModel):
-    telegram_chat_id: int
+    telegram_chat_id: Optional[int] = None
 
 
 class SessionOut(BaseModel):
     id: uuid.UUID
-    telegram_chat_id: int
+    telegram_chat_id: Optional[int]
+    source: SourceEnum
     currency: str
     tax: Decimal
     tip: Decimal
     status: str
+    title: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class SessionUpdate(BaseModel):
+    title: Optional[str] = None
 
 
 # Items
@@ -77,6 +85,7 @@ class PersonSummary(BaseModel):
 
 
 class SummaryOut(BaseModel):
+    title: str = "Receipt"
     currency: str
     people: list[PersonSummary]
 
@@ -90,6 +99,7 @@ class ScannedItem(BaseModel):
 
 
 class ScanResult(BaseModel):
+    title: str = "Receipt"
     currency: str
     tax: Decimal
     tip: Decimal

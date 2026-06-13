@@ -28,6 +28,7 @@ async def upload_receipt(
     session.tax = result.tax
     session.tip = result.tip
     session.status = "editing"
+    session.title = result.title
 
     for item_data in result.items:
         db.add(

@@ -73,7 +73,7 @@ export default function PeoplePage() {
             autoFocus={idx === names.length - 1 && idx > 0}
           />
           {names.length > 1 && (
-            <button onClick={() => removePerson(idx)} style={{ background: "none", border: "none", color: "#e53935", fontSize: 20, cursor: "pointer" }}>✕</button>
+            <button className="btn-remove" onClick={() => removePerson(idx)}>✕</button>
           )}
         </div>
       ))}

@@ -1,12 +1,9 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Numeric, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-
 from app.db import Base
-from sqlalchemy import BigInteger, ForeignKey, Numeric, String, Text
+from app.enum import SourceEnum
+from sqlalchemy import BigInteger, Enum, ForeignKey, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -21,13 +18,15 @@ class Session(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=_uuid
     )
-    telegram_chat_id: Mapped[int] = mapped_column(
-        BigInteger, nullable=False, unique=True
+    telegram_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    source: Mapped[SourceEnum] = mapped_column(
+        Enum(SourceEnum), nullable=False, default=SourceEnum.TELEGRAM
     )
     currency: Mapped[str] = mapped_column(String(10), nullable=False, default="")
     tax: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     tip: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="scanning")
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
 
     items: Mapped[list["Item"]] = relationship(
         "Item", back_populates="session", cascade="all, delete-orphan"

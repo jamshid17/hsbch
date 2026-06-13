@@ -8,6 +8,8 @@
   --secondary-bg: var(--tg-theme-secondary-bg-color, #f1f1f1);
   --radius: 12px;
   --gap: 12px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
 }
 
 *,
@@ -134,13 +136,13 @@ body {
 
 /* ── Page layout ── */
 .page {
-  padding: 16px;
+  padding: 16px 16px max(16px, calc(16px + var(--safe-bottom)));
   max-width: 480px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: var(--gap);
-  min-height: calc(100vh - 90px);
+  min-height: calc(100dvh - 90px);
 }
 
 h1 {
@@ -208,7 +210,7 @@ input[type="number"] {
   border-radius: 8px;
   background: var(--bg);
   color: var(--text);
-  font-size: 15px;
+  font-size: 16px; /* 16px prevents iOS auto-zoom on focus */
   outline: none;
   transition: border-color 0.15s;
 }
@@ -277,6 +279,25 @@ input:focus {
   background: #ff9800;
 }
 
+/* ── Remove button (44px touch target) ── */
+.btn-remove {
+  background: none;
+  border: none;
+  color: #e53935;
+  font-size: 20px;
+  cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 8px;
+  padding: 0;
+  transition: opacity 0.15s;
+}
+.btn-remove:active { opacity: 0.6; }
+
 /* ── Bottom sheet ── */
 .overlay {
   position: fixed;
@@ -292,9 +313,9 @@ input:focus {
   right: 0;
   background: var(--bg);
   border-radius: var(--radius) var(--radius) 0 0;
-  padding: 12px 16px 40px;
+  padding: 12px 16px max(40px, calc(24px + var(--safe-bottom)));
   z-index: 11;
-  max-height: 75vh;
+  max-height: 75dvh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -436,6 +457,48 @@ input:focus {
   font-size: 16px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Item fields: responsive 3-col grid ── */
+.item-fields {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.item-fields > div {
+  flex: 1;
+  min-width: 80px;
+}
+
+/* ── Small screens (≤ 380px): compress progress stepper ── */
+@media (max-width: 380px) {
+  .step-label:not(.active) {
+    display: none;
+  }
+  .step-line {
+    width: 12px;
+  }
+  .progress-steps {
+    padding: 8px 8px 6px;
+  }
+  .lang-btn {
+    padding: 3px 7px;
+    font-size: 11px;
+  }
+}
+
+/* ── Desktop: center as a phone-width app ── */
+@media (min-width: 520px) {
+  html {
+    background: var(--secondary-bg);
+  }
+  body {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    box-shadow: 0 0 32px rgba(0, 0, 0, 0.1);
+    background: var(--bg);
+  }
 }
 
 /* ── Toast ── */

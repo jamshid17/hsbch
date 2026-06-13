@@ -40,4 +40,4 @@ def get_summary(session_id: uuid.UUID, db: Session = Depends(get_db)):
     )
 
     breakdown = calculate_summary(session, items, people, assignments)
-    return SummaryOut(currency=session.currency, people=breakdown)
+    return SummaryOut(title=session.title or "Receipt", currency=session.currency, people=breakdown)
