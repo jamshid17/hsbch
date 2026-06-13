@@ -26,7 +26,6 @@ class Session(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=_uuid
     )
-    telegram_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     # Short human-friendly code others type to join this session.
     code: Mapped[str] = mapped_column(
         String(8), nullable=False, unique=True, index=True
