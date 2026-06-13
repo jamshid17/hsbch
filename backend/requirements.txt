@@ -1,4 +1,5 @@
 fastapi
+cryptography
 uvicorn[standard]
 sqlalchemy[asyncio]
 psycopg2

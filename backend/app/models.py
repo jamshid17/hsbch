@@ -1,12 +1,8 @@
 import uuid
 
-from app.db import Base
-from app.enum import SourceEnum
-from sqlalchemy import BigInteger, Enum, ForeignKey, Numeric, String, Text
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import (
     BigInteger,
+    Enum,
     ForeignKey,
     Numeric,
     String,
@@ -17,6 +13,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+from app.enum import SourceEnum
 
 
 def _uuid() -> uuid.UUID:
@@ -30,8 +27,6 @@ class Session(Base):
         UUID(as_uuid=True), primary_key=True, default=_uuid
     )
     telegram_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    source: Mapped[SourceEnum] = mapped_column(
-        Enum(SourceEnum), nullable=False, default=SourceEnum.TELEGRAM
     # Short human-friendly code others type to join this session.
     code: Mapped[str] = mapped_column(
         String(8), nullable=False, unique=True, index=True
