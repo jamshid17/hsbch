@@ -1,13 +1,17 @@
+import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import auth, config, items, receipt, sessions, summary
+from app.ws import manager
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Capture the event loop so sync routes can trigger WS broadcasts.
+    manager.set_loop(asyncio.get_running_loop())
     yield
 
 
@@ -34,6 +38,22 @@ async def telegram_webhook(request: Request):
     data = await request.json()
     await process_update(data)
     return {"ok": True}
+
+
+@app.websocket("/ws/sessions/{session_id}")
+async def session_ws(websocket: WebSocket, session_id: str):
+    """Live updates for a session: clients connect and receive an 'updated'
+    signal whenever picks/items/status change, then refetch via REST."""
+    await manager.connect(session_id, websocket)
+    try:
+        while True:
+            # We don't need client messages; this just keeps the socket open
+            # and detects disconnects.
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(session_id, websocket)
+    except Exception:
+        manager.disconnect(session_id, websocket)
 
 
 @app.get("/health")

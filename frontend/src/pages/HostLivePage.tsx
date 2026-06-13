@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, SummaryOut } from "../api";
 import { tg } from "../telegram";
+import { useSessionSocket } from "../lib/useSessionSocket";
 import Skeleton from "../components/Skeleton";
 
 function fmt(value: string | number): string {
@@ -22,6 +23,9 @@ export default function HostLivePage() {
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
 
+  // Live updates: refetch the breakdown the instant anyone changes their picks.
+  useSessionSocket(sessionId);
+
   const { data: session } = useQuery({
     queryKey: ["session", sessionId],
     queryFn: () => api.getSession(sessionId!),
@@ -37,7 +41,7 @@ export default function HostLivePage() {
   const { data: summary, isLoading } = useQuery<SummaryOut>({
     queryKey: ["live-summary", sessionId],
     queryFn: () => api.getSummary(sessionId!),
-    refetchInterval: 3000,
+    refetchInterval: 15000, // fallback; WebSocket drives real-time updates
   });
 
   const finalizeMutation = useMutation({
