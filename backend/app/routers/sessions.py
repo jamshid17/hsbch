@@ -13,6 +13,7 @@ from app.schemas import (
     SessionOut,
 )
 from app.services.telegram_auth import TelegramUser, get_tg_user
+from app.ws import manager
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -104,6 +105,7 @@ def join_session(
     person = _upsert_person(db, session_id, user)
     db.commit()
     db.refresh(person)
+    manager.notify(str(session_id), {"type": "updated", "status": session.status})
     return person
 
 
@@ -185,6 +187,7 @@ def update_my_assignments(
         saved.append(PickOut(item_id=pick.item_id, quantity=pick.quantity))
 
     db.commit()
+    manager.notify(str(session_id), {"type": "updated", "status": session.status})
     return saved
 
 
@@ -202,4 +205,5 @@ def finalize_session(
     session.status = "done"
     db.commit()
     db.refresh(session)
+    manager.notify(str(session_id), {"type": "updated", "status": session.status})
     return session

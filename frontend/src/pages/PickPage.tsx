@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { api, ItemOut, ParticipantOut } from "../api";
 import { getTelegramUser } from "../telegram";
 import { fmtQty, MAX_QTY } from "../lib/format";
+import { useSessionSocket } from "../lib/useSessionSocket";
 import Skeleton from "../components/Skeleton";
 
 function fmt(n: number): string {
@@ -32,6 +33,14 @@ export default function PickPage() {
   const { data: session } = useQuery({
     queryKey: ["session", sessionId],
     queryFn: () => api.getSession(sessionId!),
+  });
+
+  const isHost = !!session && session.telegram_chat_id === myId;
+
+  // Live updates: others' picks refetch instantly; when the host finalizes
+  // (status=done), everyone jumps to the final summary.
+  useSessionSocket(sessionId, (msg) => {
+    if (msg.status === "done") navigate(`/summary/${sessionId}`, { replace: true });
   });
 
   const { data: items, isLoading } = useQuery<ItemOut[]>({
@@ -112,7 +121,12 @@ export default function PickPage() {
           quantity: String(qty),
         }))
       ),
-    onSuccess: () => setSaved(true),
+    onSuccess: () => {
+      // Host: go to the live overview to watch everyone and finalize.
+      // Guest: stay here, just confirm the save.
+      if (isHost) navigate(`/host/${sessionId}`);
+      else setSaved(true);
+    },
     onError: (e: unknown) =>
       setError(e instanceof Error ? e.message : t("pick.failedSave")),
   });

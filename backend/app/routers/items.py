@@ -4,6 +4,7 @@ from app.db import get_db
 from app.models import Item
 from app.models import Session as SessionModel
 from app.schemas import ItemOut, ItemsUpdate
+from app.ws import manager
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -50,4 +51,5 @@ def update_items(
     db.commit()
     for item in new_items:
         db.refresh(item)
+    manager.notify(str(session_id), {"type": "updated", "status": session.status})
     return new_items

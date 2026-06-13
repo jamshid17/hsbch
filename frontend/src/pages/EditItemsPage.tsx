@@ -171,7 +171,7 @@ export default function EditItemsPage() {
         tip: effectiveTip.toFixed(2),
       });
     },
-    onSuccess: () => navigate(`/host/${sessionId}`),
+    onSuccess: () => navigate(`/pick/${sessionId}`),
     onError: (e: unknown) => setError(e instanceof Error ? e.message : t("edit.failedSave")),
   });
 
