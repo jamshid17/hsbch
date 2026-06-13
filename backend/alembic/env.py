@@ -1,7 +1,7 @@
-import os
 from logging.config import fileConfig
 
 from alembic import context
+from app.config import settings
 from app.db import Base
 from app.models import *  # noqa
 from dotenv import load_dotenv
@@ -13,7 +13,8 @@ config = context.config
 
 load_dotenv(override=True)
 
-config.set_main_option("sqlalchemy.url", f"{os.environ['DATABASE_URL']}")
+# Derived from POSTGRES_* via settings (escape % for configparser).
+config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 # config.set_main_option(
 #     "sqlalchemy.url",
 #     os.environ["DATOX_DATABASE__DSN"].replace("%", "%%"),
