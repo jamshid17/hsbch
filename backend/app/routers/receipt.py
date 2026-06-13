@@ -1,12 +1,15 @@
+import logging
 import uuid
 
 from app.db import get_db
 from app.models import Item
 from app.models import Session as SessionModel
 from app.schemas import ScanResult
-from app.services.vision import scan_receipt
+from app.services.vision import ReceiptScanError, scan_receipt
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/sessions", tags=["receipt"])
 
@@ -22,7 +25,17 @@ async def upload_receipt(
         raise HTTPException(404, "Session not found")
 
     image_bytes = await file.read()
-    result = await scan_receipt(image_bytes, file.content_type or "image/jpeg")
+    if not image_bytes:
+        raise HTTPException(400, "Bo'sh fayl yuborildi.")
+
+    try:
+        result = await scan_receipt(image_bytes, file.content_type or "image/jpeg")
+    except ReceiptScanError as e:
+        # Expected, user-facing failure (bad format, AI error, unparseable reply)
+        raise HTTPException(422, str(e))
+    except Exception as e:  # noqa: BLE001 - surface the real cause to the client
+        logger.exception("Unexpected error while scanning receipt")
+        raise HTTPException(500, f"Kutilmagan xato: {e}")
 
     session.currency = result.currency
     session.tax = result.tax

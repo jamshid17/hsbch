@@ -2,8 +2,16 @@ import uuid
 from decimal import Decimal
 from typing import Optional
 
-from app.enum import SourceEnum
 from pydantic import BaseModel
+
+from app.enum import SourceEnum
+
+
+# Auth
+class AuthUser(BaseModel):
+    id: int
+    first_name: str
+    username: str | None = None
 
 
 # Session
@@ -13,8 +21,8 @@ class SessionCreate(BaseModel):
 
 class SessionOut(BaseModel):
     id: uuid.UUID
-    telegram_chat_id: Optional[int]
-    source: SourceEnum
+    code: str
+    telegram_chat_id: int
     currency: str
     tax: Decimal
     tip: Decimal
@@ -49,29 +57,36 @@ class ItemsUpdate(BaseModel):
     tip: Decimal = Decimal("0")
 
 
-# People
-class PersonIn(BaseModel):
-    name: str
-
-
-class PersonOut(PersonIn):
+# People / participants
+class PersonOut(BaseModel):
     id: uuid.UUID
+    name: str
+    telegram_user_id: int | None = None
 
     model_config = {"from_attributes": True}
 
 
-class PeopleUpdate(BaseModel):
-    people: list[PersonIn]
-
-
-# Assignments
-class AssignmentIn(BaseModel):
+class PickOut(BaseModel):
     item_id: uuid.UUID
-    person_ids: list[uuid.UUID]
+    quantity: Decimal
 
 
-class AssignmentsUpdate(BaseModel):
-    assignments: list[AssignmentIn]
+class ParticipantOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    telegram_user_id: int | None = None
+    is_host: bool = False
+    picks: list[PickOut] = []
+
+
+# My selections (per-user assignment submit)
+class MyPick(BaseModel):
+    item_id: uuid.UUID
+    quantity: Decimal = Decimal("1")
+
+
+class MyAssignmentsUpdate(BaseModel):
+    picks: list[MyPick]
 
 
 # Summary

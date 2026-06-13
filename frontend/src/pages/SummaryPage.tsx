@@ -22,33 +22,56 @@ export default function SummaryPage() {
   const navigate = useNavigate();
 
   const [summary, setSummary] = useState<SummaryOut | null>(null);
+  const [shareLink, setShareLink] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    api.getSummary(sessionId!)
-      .then(setSummary)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : t("summary.failedLoad")))
+    Promise.all([
+      api.getSummary(sessionId!),
+      api.getSession(sessionId!),
+      api.getConfig(),
+    ])
+      .then(([sum, session, config]) => {
+        setSummary(sum);
+        // Same deep link as the invite — opening a finished session jumps
+        // straight to this summary (JoinPage routes `done` sessions here).
+        setShareLink(
+          config.bot_username
+            ? `https://t.me/${config.bot_username}?startapp=${session.code}`
+            : `${window.location.origin}/?join=${session.code}`
+        );
+      })
+      .catch((e: unknown) =>
+        setError(e instanceof Error ? e.message : t("summary.failedLoad"))
+      )
       .finally(() => setLoading(false));
   }, [sessionId]);
 
   async function handleShare() {
     if (!summary) return;
-    if (tg.initData) {
-      tg.switchInlineQuery(sessionId!, ["users", "groups"]);
+    const lines = summary.people.map(
+      (p) => `${p.name}: ${fmt(p.total)} ${summary.currency}`
+    );
+    const text = `🧾 ${t("summary.title")}\n${lines.join("\n")}`;
+
+    if (tg.initData && shareLink) {
+      tg.openTelegramLink(
+        `https://t.me/share/url?url=${encodeURIComponent(shareLink)}&text=${encodeURIComponent(text)}`
+      );
       return;
     }
-    const lines = summary.people.map((p) => `${p.name}: ${fmt(p.total)} ${summary.currency}`);
-    const text = `🧾 ${summary.title || "Bill split"}\n${lines.join("\n")}`;
+
+    const full = shareLink ? `${text}\n${shareLink}` : text;
     if (navigator.share) {
-      try { await navigator.share({ text }); return; } catch { /* cancelled */ }
+      try { await navigator.share({ text: full }); return; } catch { /* cancelled */ }
     }
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(full);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
-    } catch { window.alert(text); }
+    } catch { window.alert(full); }
   }
 
   if (loading) return <div className="page"><h1>{t("summary.title")}</h1><Skeleton count={3} height={130} /></div>;

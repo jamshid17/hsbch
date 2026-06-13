@@ -10,6 +10,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    ports:
+      - "5432:5432"
 
   app:
     build: ./backend
@@ -19,12 +21,13 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "8000:8000"
-
+      - "8080:8000"
 
   nginx:
-    # image: nginx:alpine
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
     restart: unless-stopped
     ports:
       - "80:80"

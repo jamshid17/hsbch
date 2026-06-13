@@ -1,8 +1,10 @@
 import uuid
 
 from aiogram import Bot, Dispatcher, Router
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandObject, CommandStart
 from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
     InlineQuery,
     InlineQueryResultArticle,
     InputTextMessageContent,
@@ -26,7 +28,7 @@ dp.include_router(router)
 
 
 @router.message(CommandStart())
-async def cmd_start(message: Message):
+async def cmd_start(message: Message, command: CommandObject):
     await bot.set_chat_menu_button(
         chat_id=message.chat.id,
         menu_button=MenuButtonWebApp(
@@ -34,6 +36,29 @@ async def cmd_start(message: Message):
             web_app=WebAppInfo(url=settings.webapp_url),
         ),
     )
+
+    # Deep link: /start <CODE> (from t.me/<bot>?start=<CODE>) opens the Mini App
+    # straight into the join screen for that session.
+    code = (command.args or "").strip().upper()
+    if code:
+        sep = "&" if "?" in settings.webapp_url else "?"
+        join_url = f"{settings.webapp_url}{sep}join={code}"
+        await message.answer(
+            f"You've been invited to split a bill. Tap to join code <b>{code}</b>.",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=f"Join bill {code}",
+                            web_app=WebAppInfo(url=join_url),
+                        )
+                    ]
+                ]
+            ),
+        )
+        return
+
     await message.answer("Tap the menu button below to open the bill splitter.")
 
 

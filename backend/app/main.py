@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import assignments, items, people, receipt, sessions, summary
+from app.routers import auth, config, items, receipt, sessions, summary
 
 
 @asynccontextmanager
@@ -20,11 +20,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
+app.include_router(config.router)
 app.include_router(sessions.router)
 app.include_router(receipt.router)
 app.include_router(items.router)
-app.include_router(people.router)
-app.include_router(assignments.router)
 app.include_router(summary.router)
 
 

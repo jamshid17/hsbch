@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { api } from "../api";
-import { getTelegramUser } from "../telegram";
+import { downscaleImage } from "../lib/image";
 
 export default function ScanPage() {
   const { t } = useTranslation();
@@ -28,10 +28,10 @@ export default function ScanPage() {
     setLoading(true);
     setError("");
     try {
-      const { chatId } = getTelegramUser();
-      const session = await api.createSession(chatId > 0 ? chatId : undefined);
-      const result = await api.uploadReceipt(session.id, file);
-      setScanned({ sessionId: session.id, title: result.title });
+      const image = await downscaleImage(file);
+      const session = await api.createSession();
+      await api.uploadReceipt(session.id, image);
+      navigate(`/edit/${session.id}`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t("scan.scanning"));
     } finally {
@@ -71,7 +71,6 @@ export default function ScanPage() {
           ref={inputRef}
           type="file"
           accept="image/*"
-          capture="environment"
           onChange={onFileChange}
           style={{ display: "none" }}
         />
