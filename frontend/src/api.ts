@@ -33,6 +33,7 @@ export interface SessionOut {
   tip: string;
   status: string;
   title?: string;
+  assignment_mode: string;
 }
 
 export interface ItemOut {
@@ -145,9 +146,38 @@ export const api = {
   getSummary: (sessionId: string) =>
     request<SummaryOut>(`/sessions/${sessionId}/summary`),
 
-  updateSession: (sessionId: string, data: { title?: string }) =>
+  updateSession: (sessionId: string, data: { title?: string; assignment_mode?: string }) =>
     request<SessionOut>(`/sessions/${sessionId}`, {
       method: "PATCH",
       body: JSON.stringify(data),
+    }),
+
+  // Host-assigns mode: host manages a named-only people list and assigns
+  // every item to everyone themselves.
+  listPeople: (sessionId: string) =>
+    request<PersonOut[]>(`/sessions/${sessionId}/people`),
+
+  addPerson: (sessionId: string, name: string) =>
+    request<PersonOut>(`/sessions/${sessionId}/people`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
+  bulkSetPeople: (sessionId: string, people: { name: string }[]) =>
+    request<PersonOut[]>(`/sessions/${sessionId}/people`, {
+      method: "PUT",
+      body: JSON.stringify({ people }),
+    }),
+
+  deletePerson: (sessionId: string, personId: string) =>
+    request<void>(`/sessions/${sessionId}/people/${personId}`, { method: "DELETE" }),
+
+  setHostAssignments: (
+    sessionId: string,
+    assignments: { item_id: string; person_id: string; quantity: string }[]
+  ) =>
+    request<SessionOut>(`/sessions/${sessionId}/host-assignments`, {
+      method: "PUT",
+      body: JSON.stringify({ assignments }),
     }),
 };

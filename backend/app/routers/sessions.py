@@ -9,6 +9,7 @@ from app.schemas import SessionCreate, SessionOut, SessionUpdate
 from app.models import Assignment, Item, Person
 from app.models import Session as SessionModel
 from app.schemas import (
+    HostAssignmentsUpdate,
     MyAssignmentsUpdate,
     ParticipantOut,
     PersonOut,
@@ -80,13 +81,22 @@ def create_session(
 
 @router.patch("/{session_id}", response_model=SessionOut)
 def update_session(
-    session_id: uuid.UUID, body: SessionUpdate, db: Session = Depends(get_db)
+    session_id: uuid.UUID,
+    body: SessionUpdate,
+    db: Session = Depends(get_db),
+    user: TelegramUser = Depends(get_tg_user),
 ):
     session = db.get(SessionModel, session_id)
     if not session:
         raise HTTPException(404, "Session not found")
     if body.title is not None:
         session.title = body.title
+    if body.assignment_mode is not None:
+        if session.telegram_chat_id != user.id:
+            raise HTTPException(403, "Only the host can change the split mode")
+        if body.assignment_mode not in ("collaborative", "host_assigns"):
+            raise HTTPException(400, "Invalid assignment_mode")
+        session.assignment_mode = body.assignment_mode
     db.commit()
     db.refresh(session)
     return session
@@ -204,6 +214,57 @@ def update_my_assignments(
     db.commit()
     manager.notify(str(session_id), {"type": "updated", "status": session.status})
     return saved
+
+
+@router.put("/{session_id}/host-assignments", response_model=SessionOut)
+def update_host_assignments(
+    session_id: uuid.UUID,
+    body: HostAssignmentsUpdate,
+    db: Session = Depends(get_db),
+    user: TelegramUser = Depends(get_tg_user),
+):
+    """Host-only: replace every Assignment in the session in one shot, then
+    finalize immediately. Used by the "host assigns for everyone" mode, where
+    no one else ever opens the app to pick their own items."""
+    session = db.get(SessionModel, session_id)
+    if not session:
+        raise HTTPException(404, "Session not found")
+    if session.telegram_chat_id != user.id:
+        raise HTTPException(403, "Only the host can assign items")
+
+    valid_item_ids = set(
+        db.execute(select(Item.id).where(Item.session_id == session_id)).scalars().all()
+    )
+    valid_person_ids = set(
+        db.execute(select(Person.id).where(Person.session_id == session_id)).scalars().all()
+    )
+
+    if valid_item_ids:
+        for a in (
+            db.execute(select(Assignment).where(Assignment.item_id.in_(valid_item_ids)))
+            .scalars()
+            .all()
+        ):
+            db.delete(a)
+
+    for entry in body.assignments:
+        if entry.item_id not in valid_item_ids or entry.person_id not in valid_person_ids:
+            continue
+        if entry.quantity <= 0:
+            continue
+        db.add(
+            Assignment(
+                item_id=entry.item_id,
+                person_id=entry.person_id,
+                quantity=entry.quantity,
+            )
+        )
+
+    session.status = "done"
+    db.commit()
+    db.refresh(session)
+    manager.notify(str(session_id), {"type": "updated", "status": session.status})
+    return session
 
 
 @router.post("/{session_id}/finalize", response_model=SessionOut)

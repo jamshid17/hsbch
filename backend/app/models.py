@@ -37,6 +37,11 @@ class Session(Base):
     tip: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="scanning")
     title: Mapped[str | None] = mapped_column(String, nullable=True)
+    # "collaborative": everyone joins by code and picks their own items.
+    # "host_assigns": the host assigns items to everyone themselves.
+    assignment_mode: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="collaborative"
+    )
 
     items: Mapped[list["Item"]] = relationship(
         "Item", back_populates="session", cascade="all, delete-orphan"

@@ -28,12 +28,14 @@ class SessionOut(BaseModel):
     tip: Decimal
     status: str
     title: Optional[str] = None
+    assignment_mode: str = "collaborative"
 
     model_config = {"from_attributes": True}
 
 
 class SessionUpdate(BaseModel):
     title: Optional[str] = None
+    assignment_mode: Optional[str] = None
 
 
 # Items
@@ -87,6 +89,30 @@ class MyPick(BaseModel):
 
 class MyAssignmentsUpdate(BaseModel):
     picks: list[MyPick]
+
+
+# Host-assigns mode: host manages a named-only people list and assigns
+# every item to everyone themselves (no join code needed).
+class AddPersonBody(BaseModel):
+    name: str
+
+
+class PersonNameIn(BaseModel):
+    name: str
+
+
+class PeopleBulkUpdate(BaseModel):
+    people: list[PersonNameIn]
+
+
+class HostAssignmentEntry(BaseModel):
+    item_id: uuid.UUID
+    person_id: uuid.UUID
+    quantity: Decimal = Decimal("1")
+
+
+class HostAssignmentsUpdate(BaseModel):
+    assignments: list[HostAssignmentEntry]
 
 
 # Summary

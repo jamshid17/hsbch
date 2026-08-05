@@ -107,6 +107,7 @@ export default function EditItemsPage() {
   const navigate = useNavigate();
 
   const [items, setItems] = useState<EditableItem[]>([]);
+  const [title, setTitle] = useState("");
   const [currency, setCurrency] = useState("");
   const [tax, setTax] = useState("0");
   const [tip, setTip] = useState("0");
@@ -172,7 +173,7 @@ export default function EditItemsPage() {
         tip: effectiveTip.toFixed(2),
       });
     },
-    onSuccess: () => navigate(`/pick/${sessionId}`),
+    onSuccess: () => navigate(`/mode/${sessionId}`),
     onError: (e: unknown) => setError(e instanceof Error ? e.message : t("edit.failedSave")),
   });
 

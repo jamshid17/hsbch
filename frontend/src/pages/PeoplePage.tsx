@@ -38,7 +38,7 @@ export default function PeoplePage() {
     setSaving(true);
     setError("");
     try {
-      await api.updatePeople(sessionId!, filled.map((name) => ({ name })));
+      await api.bulkSetPeople(sessionId!, filled.map((name) => ({ name })));
       await queryClient.invalidateQueries({ queryKey: ["people", sessionId] });
       navigate(`/assign/${sessionId}`);
     } catch (e: unknown) {
