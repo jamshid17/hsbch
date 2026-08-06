@@ -19,6 +19,7 @@ export default {
     subtitle: "Chekni skanerlab host bo'ling yoki do'stingiz hisobiga code bilan qo'shiling.",
     scanBtn: "📷 Chekni skanerlash",
     joinBtn: "🔑 Code bilan qo'shilish",
+    subscribeBtn: "⭐ Obuna bo'lish",
   },
   scan: {
     title: "Hisob bo'luvchi",

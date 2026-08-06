@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timedelta
 
 from aiogram import Bot, Dispatcher, F, Router
-from aiogram.filters import CommandObject, CommandStart
+from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -71,6 +71,11 @@ async def cmd_start(message: Message, command: CommandObject):
         return
 
     await message.answer("Tap the menu button below to open the bill splitter.")
+
+
+@router.message(Command("subscribe"))
+async def cmd_subscribe(message: Message):
+    await send_subscription_invoice(message)
 
 
 async def send_subscription_invoice(message: Message):

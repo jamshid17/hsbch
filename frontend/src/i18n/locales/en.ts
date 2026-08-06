@@ -19,6 +19,7 @@ export default {
     subtitle: "Scan a receipt to host, or join a friend's bill with a code.",
     scanBtn: "📷 Scan a receipt",
     joinBtn: "🔑 Join with a code",
+    subscribeBtn: "⭐ Subscribe",
   },
   scan: {
     title: "Bill Splitter",
