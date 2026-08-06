@@ -3,6 +3,14 @@ import type { TelegramAuthUser } from "./types/auth";
 
 const BASE = "/api";
 
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   // For FormData (file upload) we must NOT set Content-Type — the browser sets
   // it together with the multipart boundary. Forcing application/json there
@@ -18,7 +26,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text || res.statusText);
+    let message = text || res.statusText;
+    try {
+      const parsed = JSON.parse(text);
+      if (typeof parsed?.detail === "string") message = parsed.detail;
+    } catch {
+      // Not JSON — keep the raw text as the message.
+    }
+    throw new ApiError(message, res.status);
   }
   if (res.status === 204) return undefined as T;
   return res.json();

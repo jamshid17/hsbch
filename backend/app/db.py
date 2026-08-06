@@ -4,6 +4,7 @@ from typing import Any, Iterator
 
 from app.config import settings
 from sqlalchemy import Column, DateTime, create_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.sql import func
@@ -67,3 +68,16 @@ def open_session() -> Iterator[Session]:
     """
 
     return get_db()
+
+
+# Async engine/session for the aiogram bot handlers (app/bot.py), which run
+# inside the event loop and can't block it with the sync SessionFactory above.
+async_engine = create_async_engine(
+    settings.database_url.replace("postgresql://", "postgresql+asyncpg://", 1),
+    pool_size=30,
+    max_overflow=20,
+    pool_timeout=60,
+    pool_recycle=1800,
+    pool_pre_ping=True,
+)
+AsyncSessionLocal = async_sessionmaker(async_engine, expire_on_commit=False)

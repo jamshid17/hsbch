@@ -28,6 +28,7 @@ export default {
     scanning: "Skanerlanmoqda…",
     scannedAs: "Chek nomi",
     continueBtn: "Davom etish →",
+    subscribeBtn: "Obuna bo'lish",
   },
   edit: {
     title: "Mahsulotlarni tekshiring",

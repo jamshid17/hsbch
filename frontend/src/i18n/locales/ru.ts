@@ -28,6 +28,7 @@ export default {
     scanning: "Сканирование…",
     scannedAs: "Название чека",
     continueBtn: "Продолжить →",
+    subscribeBtn: "Оформить подписку",
   },
   edit: {
     title: "Проверьте позиции",

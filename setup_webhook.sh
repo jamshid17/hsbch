@@ -8,6 +8,6 @@ set -a
 source "${SCRIPT_DIR}/backend/.env"
 set +a
 
-curl -s "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook?url=${WEBAPP_URL}/webhook"
+curl -s "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook?url=${WEBAPP_URL}/webhook&secret_token=${TELEGRAM_WEBHOOK_SECRET}"
 echo ""
 echo "Webhook registered -> ${WEBAPP_URL}/webhook"

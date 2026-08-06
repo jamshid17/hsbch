@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime, timedelta
 
-from aiogram import Bot, Dispatcher, Router
+from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import CommandObject, CommandStart
 from aiogram.types import (
     InlineKeyboardButton,
@@ -8,17 +9,20 @@ from aiogram.types import (
     InlineQuery,
     InlineQueryResultArticle,
     InputTextMessageContent,
+    LabeledPrice,
     MenuButtonWebApp,
     Message,
+    PreCheckoutQuery,
     Update,
     WebAppInfo,
 )
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.calculator import calculate_summary
 from app.config import settings
 from app.db import AsyncSessionLocal
-from app.models import Assignment, Item, Person
+from app.models import Assignment, BotUser, Item, Payment, Person
 from app.models import Session as SessionModel
 
 bot = Bot(token=settings.bot_token)
@@ -37,9 +41,16 @@ async def cmd_start(message: Message, command: CommandObject):
         ),
     )
 
+    # Deep link: /start subscribe (from the Mini App's quota-exceeded button)
+    # sends the subscription invoice right here in the chat.
+    raw_arg = (command.args or "").strip()
+    if raw_arg.lower() == "subscribe":
+        await send_subscription_invoice(message)
+        return
+
     # Deep link: /start <CODE> (from t.me/<bot>?start=<CODE>) opens the Mini App
     # straight into the join screen for that session.
-    code = (command.args or "").strip().upper()
+    code = raw_arg.upper()
     if code:
         sep = "&" if "?" in settings.webapp_url else "?"
         join_url = f"{settings.webapp_url}{sep}join={code}"
@@ -60,6 +71,75 @@ async def cmd_start(message: Message, command: CommandObject):
         return
 
     await message.answer("Tap the menu button below to open the bill splitter.")
+
+
+async def send_subscription_invoice(message: Message):
+    await bot.send_invoice(
+        chat_id=message.chat.id,
+        title="30 kunlik cheksiz skanerlash",
+        description=(
+            f"{settings.subscription_days} kun davomida kunlik limitsiz "
+            "chek skanerlash imkoniyati."
+        ),
+        payload=f"subscription:{message.from_user.id}",
+        provider_token=settings.payment_provider_token,
+        currency="UZS",
+        prices=[
+            LabeledPrice(label="Obuna", amount=settings.subscription_price_uzs * 100)
+        ],
+    )
+
+
+@router.pre_checkout_query()
+async def handle_pre_checkout(pre_checkout_query: PreCheckoutQuery):
+    # Digital service, always in stock — nothing to validate, just approve.
+    # Telegram requires an answer within 10 seconds or the payment is cancelled.
+    await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+
+
+@router.message(F.successful_payment)
+async def handle_successful_payment(message: Message):
+    sp = message.successful_payment
+    user_id = message.from_user.id
+
+    async with AsyncSessionLocal() as db:
+        exists = (
+            await db.execute(
+                select(Payment).where(
+                    Payment.telegram_payment_charge_id == sp.telegram_payment_charge_id
+                )
+            )
+        ).scalar_one_or_none()
+        if exists:
+            # Telegram redelivered an already-processed successful_payment.
+            return
+
+        db.add(
+            Payment(
+                telegram_user_id=user_id,
+                telegram_payment_charge_id=sp.telegram_payment_charge_id,
+                provider_payment_charge_id=sp.provider_payment_charge_id,
+                amount_tiyin=sp.total_amount,
+                currency=sp.currency,
+            )
+        )
+
+        now = datetime.utcnow()
+        stmt = (
+            pg_insert(BotUser)
+            .values(telegram_user_id=user_id, subscription_until=now)
+            .on_conflict_do_nothing(index_elements=[BotUser.telegram_user_id])
+        )
+        await db.execute(stmt)
+        user = await db.get(BotUser, user_id)
+        base = user.subscription_until if user.subscription_until and user.subscription_until > now else now
+        user.subscription_until = base + timedelta(days=settings.subscription_days)
+
+        await db.commit()
+
+    await message.answer(
+        "✅ Obuna faollashtirildi! Endi kunlik limitsiz chek skanerlashingiz mumkin."
+    )
 
 
 @router.inline_query()

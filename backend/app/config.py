@@ -15,6 +15,17 @@ class Settings(BaseSettings):
     # For local development / browser testing only. Never enable in production.
     dev_allow_unsafe: bool = False
 
+    # Paycom/UZS provider_token from BotFather's Payments menu.
+    payment_provider_token: str
+    # Raw UZS (not tiyin) — multiplied by 100 at the sendInvoice call site.
+    subscription_price_uzs: int
+    subscription_days: int = 30
+    # Must match the secret_token passed to Telegram's setWebhook, and is
+    # checked against the X-Telegram-Bot-Api-Secret-Token header on every
+    # /webhook request — without it, anyone could POST a forged
+    # successful_payment update and grant themselves a free subscription.
+    telegram_webhook_secret: str
+
     @property
     def database_url(self) -> str:
         # Derived from POSTGRES_* (single source of truth) so the app's

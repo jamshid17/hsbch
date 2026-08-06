@@ -1,9 +1,10 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import settings
 from app.routers import auth, config, items, people, receipt, sessions, summary
 from app.ws import manager
 
@@ -35,6 +36,11 @@ app.include_router(summary.router)
 
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
+    # Telegram echoes back the secret_token passed to setWebhook on every
+    # request — without checking it, anyone could POST a forged update here
+    # (e.g. a fake successful_payment) and grant themselves a subscription.
+    if request.headers.get("x-telegram-bot-api-secret-token") != settings.telegram_webhook_secret:
+        raise HTTPException(403, "Forbidden")
     from app.bot import process_update
     data = await request.json()
     await process_update(data)

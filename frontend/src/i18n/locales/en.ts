@@ -28,6 +28,7 @@ export default {
     scanning: "Scanning…",
     scannedAs: "Scanned as",
     continueBtn: "Continue →",
+    subscribeBtn: "Subscribe",
   },
   edit: {
     title: "Review Items",

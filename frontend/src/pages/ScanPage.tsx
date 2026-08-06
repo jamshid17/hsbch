@@ -1,8 +1,10 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { api } from "../api";
+import { useQuery } from "@tanstack/react-query";
+import { api, ApiError } from "../api";
 import { downscaleImage } from "../lib/image";
+import { tg } from "../telegram";
 
 export default function ScanPage() {
   const { t } = useTranslation();
@@ -12,7 +14,13 @@ export default function ScanPage() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
   const [scanned, setScanned] = useState<{ sessionId: string; title: string } | null>(null);
+
+  const { data: config } = useQuery({
+    queryKey: ["config"],
+    queryFn: () => api.getConfig(),
+  });
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -20,6 +28,7 @@ export default function ScanPage() {
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setError("");
+    setQuotaExceeded(false);
     setScanned(null);
   }
 
@@ -27,16 +36,26 @@ export default function ScanPage() {
     if (!file) return;
     setLoading(true);
     setError("");
+    setQuotaExceeded(false);
     try {
       const image = await downscaleImage(file);
       const session = await api.createSession();
       await api.uploadReceipt(session.id, image);
       navigate(`/edit/${session.id}`);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : t("scan.scanning"));
+      if (e instanceof ApiError && e.status === 402) {
+        setQuotaExceeded(true);
+        setError(e.message);
+      } else {
+        setError(e instanceof Error ? e.message : t("scan.scanning"));
+      }
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleSubscribe() {
+    tg.openTelegramLink(`https://t.me/${config?.bot_username ?? "hsbchbot"}?start=subscribe`);
   }
 
   async function handleContinue() {
@@ -89,6 +108,11 @@ export default function ScanPage() {
       )}
 
       {error && <p className="error">{error}</p>}
+      {quotaExceeded && (
+        <button className="btn" onClick={handleSubscribe}>
+          {t("scan.subscribeBtn")}
+        </button>
+      )}
 
       {scanned ? (
         <button className="btn" onClick={handleContinue}>

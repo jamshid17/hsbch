@@ -13,3 +13,4 @@ aiogram
 cryptography
 python-multipart
 httpx
+tzdata

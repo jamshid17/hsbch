@@ -1,7 +1,10 @@
 import uuid
+from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
+    Date,
+    DateTime,
     Enum,
     ForeignKey,
     Numeric,
@@ -111,3 +114,38 @@ class Assignment(Base):
 
     item: Mapped["Item"] = relationship("Item", back_populates="assignments")
     person: Mapped["Person"] = relationship("Person", back_populates="assignments")
+
+
+class BotUser(Base):
+    """Top-level, session-independent Telegram identity: tracks the free daily
+    receipt-scan quota and any active paid subscription."""
+
+    __tablename__ = "bot_users"
+
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    scan_count: Mapped[int] = mapped_column(nullable=False, default=0)
+    # Asia/Tashkent calendar date scan_count applies to; reset lazily on read.
+    quota_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # UTC instant the subscription lapses; NULL or past = free tier.
+    subscription_until: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
+
+
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=_uuid
+    )
+    telegram_user_id: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, index=True
+    )
+    # Telegram's own charge id — unique so a retried successful_payment update
+    # (at-least-once delivery) can't grant a second subscription period.
+    telegram_payment_charge_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, unique=True
+    )
+    provider_payment_charge_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    amount_tiyin: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    currency: Mapped[str] = mapped_column(String(10), nullable=False)
