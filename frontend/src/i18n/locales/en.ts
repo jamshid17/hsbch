@@ -141,4 +141,14 @@ export default {
     activated: "✅ Subscription activated!",
     retryHint: "You can scan the receipt again now.",
   },
+  card: {
+    title: "💳 Pay by card",
+    copy: "Copy",
+    copied: "✓ Copied",
+    amount: "Amount",
+    currency: "UZS",
+    instruction: "After paying, send the receipt (screenshot) to @{{admin}} — the subscription is enabled manually.",
+    sendReceipt: "Send receipt to @{{admin}}",
+    or: "or",
+  },
 } as const;

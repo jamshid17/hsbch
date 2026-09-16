@@ -180,6 +180,43 @@ h2 {
   gap: 8px;
 }
 
+/* ── Manual card payment ── */
+.card-number-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1.5px solid var(--surface);
+  cursor: pointer;
+}
+
+.card-number {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--hint);
+  font-size: 13px;
+  margin: 2px 0;
+}
+
+.or-divider::before,
+.or-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--surface);
+}
+
 /* ── Buttons ── */
 .btn {
   display: block;

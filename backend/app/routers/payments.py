@@ -33,6 +33,19 @@ def get_me(
     used = user.scan_count if user and user.quota_date == today else 0
     scans_left = max(settings.free_daily_scans - used, 0)
 
+    # None (not an empty object) when card payments aren't configured, so the
+    # client has a single flag to branch on.
+    card = (
+        {
+            "number": settings.card_number,
+            "holder": settings.card_holder,
+            "price_uzs": settings.subscription_price_uzs,
+            "admin_contact": settings.admin_contact,
+        }
+        if settings.card_number
+        else None
+    )
+
     return {
         "is_subscribed": subscribed,
         "subscription_until": (
@@ -42,6 +55,7 @@ def get_me(
         "free_daily_scans": settings.free_daily_scans,
         "price_stars": settings.subscription_stars,
         "subscription_days": settings.subscription_days,
+        "card": card,
     }
 
 

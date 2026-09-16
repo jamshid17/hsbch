@@ -24,6 +24,14 @@ class Settings(BaseSettings):
     free_daily_scans: int = 1
     # Comma-separated Telegram user ids allowed to run /refund.
     admin_telegram_ids: str = ""
+
+    # Manual card payments: the user transfers to this card and sends the
+    # receipt to @<admin_contact>, who then enables the subscription by hand.
+    # Empty card_number hides the whole card block in the Mini App.
+    card_number: str = ""
+    card_holder: str = ""
+    subscription_price_uzs: int = 0
+    admin_contact: str = "hsbchadmin"
     # Must match the secret_token passed to Telegram's setWebhook, and is
     # checked against the X-Telegram-Bot-Api-Secret-Token header on every
     # /webhook request — without it, anyone could POST a forged

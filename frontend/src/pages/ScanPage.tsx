@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "../api";
 import { downscaleImage } from "../lib/image";
 import { useSubscribe } from "../lib/useSubscribe";
+import CardPayment from "../components/CardPayment";
 
 export default function ScanPage() {
   const { t } = useTranslation();
@@ -131,6 +132,13 @@ export default function ScanPage() {
           {subState === "cancelled" && <p className="error">{t("pay.cancelled")}</p>}
           {subState === "failed" && <p className="error">{t("pay.failed")}</p>}
           {subState === "paid" && <p className="success">{t("pay.activated")}</p>}
+
+          {me?.card && (
+            <>
+              <div className="or-divider">{t("card.or")}</div>
+              <CardPayment card={me.card} />
+            </>
+          )}
         </>
       )}
 

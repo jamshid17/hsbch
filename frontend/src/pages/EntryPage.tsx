@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api";
 import { getJoinCode } from "../telegram";
 import { useSubscribe } from "../lib/useSubscribe";
+import CardPayment from "../components/CardPayment";
 
 export default function EntryPage() {
   const { t } = useTranslation();
@@ -67,6 +68,13 @@ export default function EntryPage() {
                 total: me.free_daily_scans,
               })}
             </p>
+          )}
+
+          {me?.card && (
+            <>
+              <div className="or-divider">{t("card.or")}</div>
+              <CardPayment card={me.card} />
+            </>
           )}
         </>
       )}

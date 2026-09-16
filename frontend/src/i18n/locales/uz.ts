@@ -141,4 +141,14 @@ export default {
     activated: "✅ Obuna faollashtirildi!",
     retryHint: "Endi chekni qayta skanerlashingiz mumkin.",
   },
+  card: {
+    title: "💳 Karta orqali to'lash",
+    copy: "Nusxalash",
+    copied: "✓ Nusxalandi",
+    amount: "To'lov summasi",
+    currency: "so'm",
+    instruction: "To'lovni amalga oshirgach, chek (skrinshot) ni @{{admin}} ga yuboring — obuna qo'lda yoqiladi.",
+    sendReceipt: "@{{admin}} ga chek yuborish",
+    or: "yoki",
+  },
 } as const;

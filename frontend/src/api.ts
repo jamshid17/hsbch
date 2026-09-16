@@ -108,6 +108,12 @@ export interface MeOut {
   free_daily_scans: number;
   price_stars: number;
   subscription_days: number;
+  card: {
+    number: string;
+    holder: string;
+    price_uzs: number;
+    admin_contact: string;
+  } | null;
 }
 
 export const api = {
