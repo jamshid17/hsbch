@@ -15,12 +15,11 @@ export default {
     note: "Это Telegram Mini App. Откройте его внутри Telegram, чтобы начать.",
   },
   entry: {
+    adminBtn: "🛠 Админ-панель",
     title: "Делим счёт",
     subtitle: "Отсканируйте чек как организатор или присоединитесь к счёту друга по коду.",
     scanBtn: "📷 Сканировать чек",
     joinBtn: "🔑 Присоединиться по коду",
-    subscribeBtn: "⭐ Оформить подписку",
-    subscribeStars: "⭐ Подписка на {{days}} дней за {{stars}} звёзд",
     subActive: "Подписка активна — до {{date}}",
     scansLeft: "Осталось бесплатных сканов: {{left}}/{{total}}",
     freeUsedUp: "Бесплатные {{total}} сканов закончились. Нужна подписка.",
@@ -33,8 +32,6 @@ export default {
     scanning: "Сканирование…",
     scannedAs: "Название чека",
     continueBtn: "Продолжить →",
-    subscribeBtn: "Оформить подписку",
-    subscribeStars: "⭐ Подписка за {{stars}} звёзд ({{days}} дней)",
   },
   edit: {
     title: "Проверьте позиции",
@@ -135,12 +132,6 @@ export default {
     copied: "✓ Скопировано",
     grandTotal: "Итого",
     failedLoad: "Ошибка загрузки",
-  },
-  pay: {
-    cancelled: "Платёж отменён.",
-    failed: "Платёж не прошёл. Попробуйте ещё раз.",
-    activated: "✅ Подписка активирована!",
-    retryHint: "Теперь можно отсканировать чек ещё раз.",
   },
   card: {
     title: "💳 Оплата картой",

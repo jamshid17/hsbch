@@ -15,12 +15,11 @@ export default {
     note: "This is a Telegram Mini App. Open it inside Telegram to start splitting.",
   },
   entry: {
+    adminBtn: "🛠 Admin panel",
     title: "Bill Splitter",
     subtitle: "Scan a receipt to host, or join a friend's bill with a code.",
     scanBtn: "📷 Scan a receipt",
     joinBtn: "🔑 Join with a code",
-    subscribeBtn: "⭐ Subscribe",
-    subscribeStars: "⭐ Subscribe for {{stars}} stars / {{days}} days",
     subActive: "Subscription active — until {{date}}",
     scansLeft: "Free scans left: {{left}}/{{total}}",
     freeUsedUp: "Your {{total}} free scans are used up. A subscription unlocks more.",
@@ -33,8 +32,6 @@ export default {
     scanning: "Scanning…",
     scannedAs: "Scanned as",
     continueBtn: "Continue →",
-    subscribeBtn: "Subscribe",
-    subscribeStars: "⭐ Subscribe for {{stars}} stars ({{days}} days)",
   },
   edit: {
     title: "Review Items",
@@ -135,12 +132,6 @@ export default {
     copied: "✓ Copied to clipboard",
     grandTotal: "Grand total",
     failedLoad: "Failed to load",
-  },
-  pay: {
-    cancelled: "Payment cancelled.",
-    failed: "Payment failed. Please try again.",
-    activated: "✅ Subscription activated!",
-    retryHint: "You can scan the receipt again now.",
   },
   card: {
     title: "💳 Pay by card",

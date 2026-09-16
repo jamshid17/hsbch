@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.routers import (
+    admin,
     auth,
     config,
     items,
@@ -42,6 +43,7 @@ app.include_router(receipt.router)
 app.include_router(items.router)
 app.include_router(summary.router)
 app.include_router(payments.router)
+app.include_router(admin.router)
 
 
 @app.post("/webhook")

@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "../api";
 import { downscaleImage } from "../lib/image";
-import { useSubscribe } from "../lib/useSubscribe";
 import CardPayment from "../components/CardPayment";
 
 export default function ScanPage() {
@@ -18,17 +17,10 @@ export default function ScanPage() {
   const [quotaExceeded, setQuotaExceeded] = useState(false);
   const [scanned, setScanned] = useState<{ sessionId: string; title: string } | null>(null);
 
-  const { data: config } = useQuery({
-    queryKey: ["config"],
-    queryFn: () => api.getConfig(),
-  });
-
   const { data: me } = useQuery({
     queryKey: ["me"],
     queryFn: () => api.getMe(),
   });
-
-  const { subscribe, state: subState } = useSubscribe(config?.bot_username);
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -39,15 +31,6 @@ export default function ScanPage() {
     setQuotaExceeded(false);
     setScanned(null);
   }
-
-  // Once the payment lands, drop the quota error so the user can scan again
-  // without re-picking the same photo.
-  useEffect(() => {
-    if (subState === "paid") {
-      setQuotaExceeded(false);
-      setError("");
-    }
-  }, [subState]);
 
   async function handleScan() {
     if (!file) return;
@@ -121,29 +104,8 @@ export default function ScanPage() {
       )}
 
       {error && <p className="error">{error}</p>}
-      {quotaExceeded && !me?.is_subscribed && (
-        <>
-          <button className="btn" disabled={subState === "opening"} onClick={subscribe}>
-            {t("scan.subscribeStars", {
-              stars: me?.price_stars ?? 50,
-              days: me?.subscription_days ?? 30,
-            })}
-          </button>
-          {subState === "cancelled" && <p className="error">{t("pay.cancelled")}</p>}
-          {subState === "failed" && <p className="error">{t("pay.failed")}</p>}
-          {subState === "paid" && <p className="success">{t("pay.activated")}</p>}
-
-          {me?.card && (
-            <>
-              <div className="or-divider">{t("card.or")}</div>
-              <CardPayment card={me.card} />
-            </>
-          )}
-        </>
-      )}
-
-      {subState === "paid" && !scanned && (
-        <p style={{ color: "var(--hint)", fontSize: 14 }}>{t("pay.retryHint")}</p>
+      {quotaExceeded && !me?.is_subscribed && me?.card && (
+        <CardPayment card={me.card} />
       )}
 
       {scanned ? (

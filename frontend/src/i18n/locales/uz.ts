@@ -15,12 +15,11 @@ export default {
     note: "Bu — Telegram Mini App. Boshlash uchun uni Telegram ichida oching.",
   },
   entry: {
+    adminBtn: "🛠 Admin panel",
     title: "Hisob bo'luvchi",
     subtitle: "Chekni skanerlab host bo'ling yoki do'stingiz hisobiga code bilan qo'shiling.",
     scanBtn: "📷 Chekni skanerlash",
     joinBtn: "🔑 Code bilan qo'shilish",
-    subscribeBtn: "⭐ Obuna bo'lish",
-    subscribeStars: "⭐ {{stars}} yulduzga {{days}} kunlik obuna",
     subActive: "Obuna faol — {{date}} gacha",
     scansLeft: "Bepul skan: {{left}}/{{total}} qoldi",
     freeUsedUp: "Bepul {{total}} ta skan tugadi. Davom etish uchun obuna kerak.",
@@ -33,8 +32,6 @@ export default {
     scanning: "Skanerlanmoqda…",
     scannedAs: "Chek nomi",
     continueBtn: "Davom etish →",
-    subscribeBtn: "Obuna bo'lish",
-    subscribeStars: "⭐ {{stars}} yulduzga obuna ({{days}} kun)",
   },
   edit: {
     title: "Mahsulotlarni tekshiring",
@@ -135,12 +132,6 @@ export default {
     copied: "✓ Buferga nusxalandi",
     grandTotal: "Jami",
     failedLoad: "Yuklab bo'lmadi",
-  },
-  pay: {
-    cancelled: "To'lov bekor qilindi.",
-    failed: "To'lov amalga oshmadi. Qaytadan urinib ko'ring.",
-    activated: "✅ Obuna faollashtirildi!",
-    retryHint: "Endi chekni qayta skanerlashingiz mumkin.",
   },
   card: {
     title: "💳 Karta orqali to'lash",

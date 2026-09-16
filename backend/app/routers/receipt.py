@@ -4,7 +4,7 @@ from datetime import datetime
 
 from app.config import settings
 from app.db import get_db
-from app.models import BotUser, Item
+from app.models import BotUser, Item, ReceiptScan
 from app.models import Session as SessionModel
 from app.schemas import ScanResult
 from app.services.telegram_auth import TelegramUser, get_tg_user
@@ -64,6 +64,30 @@ def _release_scan_slot(db: Session, telegram_user_id: int) -> None:
     db.commit()
 
 
+def _log_scan(db: Session, telegram_user_id: int, session_id: uuid.UUID) -> None:
+    """Record the scan for the admin dashboard and bump the lifetime counter.
+
+    Only called once the scan actually succeeded, so the numbers match what
+    users got out of the app rather than what they attempted.
+    """
+    user = db.get(BotUser, telegram_user_id)
+    subscribed = bool(
+        user and user.subscription_until and user.subscription_until > datetime.utcnow()
+    )
+    db.add(
+        ReceiptScan(
+            telegram_user_id=telegram_user_id,
+            session_id=session_id,
+            was_subscribed=subscribed,
+        )
+    )
+    db.execute(
+        update(BotUser)
+        .where(BotUser.telegram_user_id == telegram_user_id)
+        .values(scans_total=BotUser.scans_total + 1)
+    )
+
+
 @router.post("/{session_id}/receipt", response_model=ScanResult)
 async def upload_receipt(
     session_id: uuid.UUID,
@@ -83,8 +107,7 @@ async def upload_receipt(
         raise HTTPException(
             402,
             f"Bepul {settings.free_total_scans} ta skan tugadi. "
-            f"{settings.subscription_days} kunlik cheksiz obuna — "
-            f"{settings.subscription_stars} ⭐.",
+            f"Davom etish uchun {settings.subscription_days} kunlik obuna kerak.",
         )
 
     try:
@@ -97,6 +120,8 @@ async def upload_receipt(
         logger.exception("Unexpected error while scanning receipt")
         _release_scan_slot(db, tg_user.id)
         raise HTTPException(500, f"Kutilmagan xato: {e}")
+
+    _log_scan(db, tg_user.id, session_id)
 
     session.currency = result.currency
     session.tax = result.tax

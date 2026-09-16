@@ -15,14 +15,11 @@ class Settings(BaseSettings):
     # For local development / browser testing only. Never enable in production.
     dev_allow_unsafe: bool = False
 
-    # Telegram Stars (XTR) subscription: the price is the star count itself,
-    # not a minor unit, so it goes into LabeledPrice.amount as-is.
-    subscription_stars: int = 50
     subscription_days: int = 30
     # Lifetime free receipt scans per user (not per day) before a subscription
     # is required.
     free_total_scans: int = 5
-    # Comma-separated Telegram user ids allowed to run /refund.
+    # Comma-separated Telegram user ids that get the in-app admin panel.
     admin_telegram_ids: str = ""
 
     # Manual card payments: the user transfers to this card and sends the

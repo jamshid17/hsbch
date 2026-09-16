@@ -106,14 +106,43 @@ export interface MeOut {
   subscription_until: string | null;
   scans_left: number;
   free_total_scans: number;
-  price_stars: number;
   subscription_days: number;
+  is_admin: boolean;
   card: {
     number: string;
     holder: string;
     price_uzs: number;
     admin_contact: string;
   } | null;
+}
+
+export interface AdminStats {
+  users_total: number;
+  users_today: number;
+  users_week: number;
+  scans_total: number;
+  scans_today: number;
+  scans_week: number;
+  subscribed: number;
+  exhausted: number;
+  sessions_total: number;
+  revenue_month: number;
+  payments_month: number;
+  price_uzs: number;
+  daily_scans: { date: string; scans: number }[];
+}
+
+export interface AdminUser {
+  telegram_user_id: number;
+  first_name: string | null;
+  username: string | null;
+  free_scans_used: number;
+  free_total_scans: number;
+  scans_total: number;
+  is_subscribed: boolean;
+  subscription_until: string | null;
+  last_seen_at: string | null;
+  created_at: string | null;
 }
 
 export const api = {
@@ -127,8 +156,25 @@ export const api = {
 
   getMe: () => request<MeOut>("/me"),
 
-  createInvoiceLink: () =>
-    request<{ link: string; price_stars: number }>("/payments/invoice-link", {
+  adminStats: () => request<AdminStats>("/admin/stats"),
+
+  adminUsers: (params: { search?: string; filter?: string; limit?: number; offset?: number }) => {
+    const q = new URLSearchParams();
+    if (params.search) q.set("search", params.search);
+    if (params.filter && params.filter !== "all") q.set("filter", params.filter);
+    q.set("limit", String(params.limit ?? 50));
+    q.set("offset", String(params.offset ?? 0));
+    return request<{ total: number; users: AdminUser[] }>(`/admin/users?${q}`);
+  },
+
+  adminGrant: (userId: number, days: number) =>
+    request<{ subscription_until: string; days_added: number }>(
+      `/admin/users/${userId}/grant`,
+      { method: "POST", body: JSON.stringify({ days }) },
+    ),
+
+  adminRevoke: (userId: number) =>
+    request<{ is_subscribed: boolean }>(`/admin/users/${userId}/revoke`, {
       method: "POST",
     }),
 

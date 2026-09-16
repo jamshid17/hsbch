@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     DateTime,
     Enum,
     ForeignKey,
@@ -116,15 +117,23 @@ class Assignment(Base):
 
 
 class BotUser(Base):
-    """Top-level, session-independent Telegram identity: tracks the free daily
-    receipt-scan quota and any active paid subscription."""
+    """Top-level, session-independent Telegram identity: tracks the free scan
+    allowance, any active subscription, and enough profile data for the admin
+    dashboard to show who someone is."""
 
     __tablename__ = "bot_users"
 
     telegram_user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    # Refreshed from initData on every Mini App open — Telegram is the source
+    # of truth and people do rename themselves.
+    first_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    username: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Free scans this user has spent in total — never reset; once it reaches
     # settings.free_total_scans only a subscription unlocks further scans.
     free_scans_used: Mapped[int] = mapped_column(nullable=False, default=0)
+    # Every successful scan, free or subscribed — what the dashboard counts.
+    scans_total: Mapped[int] = mapped_column(nullable=False, default=0)
     # UTC instant the subscription lapses; NULL or past = free tier.
     subscription_until: Mapped[datetime | None] = mapped_column(
         DateTime, nullable=True
@@ -140,19 +149,41 @@ class Payment(Base):
     telegram_user_id: Mapped[int] = mapped_column(
         BigInteger, nullable=False, index=True
     )
-    # Telegram's own charge id — unique so a retried successful_payment update
-    # (at-least-once delivery) can't grant a second subscription period.
-    telegram_payment_charge_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, unique=True
+    # Only set for payments Telegram itself settled; card transfers are
+    # confirmed by an admin and have no charge id at all.
+    telegram_payment_charge_id: Mapped[str | None] = mapped_column(
+        String(128), nullable=True, unique=True
     )
-    # Empty/absent for Telegram Stars (there is no external provider), so this
-    # can't stay NOT NULL the way it could for Paycom.
     provider_payment_charge_id: Mapped[str | None] = mapped_column(
         String(128), nullable=True
     )
-    # Interpreted through `currency`: star count for XTR, tiyin for UZS.
     amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
     currency: Mapped[str] = mapped_column(String(10), nullable=False)
-    # Set when the charge is refunded via refundStarPayment; the subscription
-    # is revoked at the same time.
+    # "card" (admin-confirmed transfer) or "manual" (comped by an admin).
+    method: Mapped[str] = mapped_column(String(16), nullable=False, default="card")
+    # Which admin enabled it; NULL for anything granted automatically.
+    granted_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
     refunded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class ReceiptScan(Base):
+    """One row per successful receipt scan — the raw event the dashboard
+    aggregates (per day, per user). bot_users.scans_total is the running
+    counter; this is the history."""
+
+    __tablename__ = "receipt_scans"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=_uuid
+    )
+    telegram_user_id: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, index=True
+    )
+    session_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    # False when the scan came out of the free allowance.
+    was_subscribed: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )

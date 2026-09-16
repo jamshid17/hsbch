@@ -11,6 +11,7 @@ import HostLivePage from "./pages/HostLivePage";
 import PeoplePage from "./pages/PeoplePage";
 import AssignPage from "./pages/AssignPage";
 import SummaryPage from "./pages/SummaryPage";
+import AdminPage from "./pages/AdminPage";
 import ProgressSteps from "./components/ProgressSteps";
 import LanguageSwitcher from "./components/LanguageSwitcher";
 import "./app.css";
@@ -60,6 +61,7 @@ export default function App() {
         <Route path="/people/:sessionId" element={<PeoplePage />} />
         <Route path="/assign/:sessionId" element={<AssignPage />} />
         <Route path="/summary/:sessionId" element={<SummaryPage />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
