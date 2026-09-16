@@ -22,7 +22,8 @@ export default {
     subscribeBtn: "⭐ Оформить подписку",
     subscribeStars: "⭐ Подписка на {{days}} дней за {{stars}} звёзд",
     subActive: "Подписка активна — до {{date}}",
-    scansLeft: "Бесплатных сканов сегодня: {{left}}/{{total}}",
+    scansLeft: "Осталось бесплатных сканов: {{left}}/{{total}}",
+    freeUsedUp: "Бесплатные {{total}} сканов закончились. Нужна подписка.",
   },
   scan: {
     title: "Делим счёт",

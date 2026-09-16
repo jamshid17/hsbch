@@ -1,7 +1,6 @@
 import logging
 import uuid
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from app.config import settings
 from app.db import get_db
@@ -11,7 +10,7 @@ from app.schemas import ScanResult
 from app.services.telegram_auth import TelegramUser, get_tg_user
 from app.services.vision import ReceiptScanError, scan_receipt
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
-from sqlalchemy import case, func, or_, update
+from sqlalchemy import func, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -19,16 +18,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/sessions", tags=["receipt"])
 
-TASHKENT = ZoneInfo("Asia/Tashkent")
-
 
 def _claim_scan_slot(db: Session, telegram_user_id: int) -> bool:
-    """Atomically claim one of today's free scan slots for this user.
+    """Atomically spend one of this user's lifetime free scans.
 
-    Returns True if a slot was claimed (or an active subscription makes the
-    quota moot), False if today's free limit is already used up. The UPDATE's
-    row lock is what makes this safe under concurrent requests from the same
-    user — there's no separate read-then-write race window.
+    Returns True if a scan was claimed (or an active subscription makes the
+    quota moot), False once all free scans are used up. The UPDATE's row lock
+    is what makes this safe under concurrent requests from the same user —
+    there's no separate read-then-write race window.
     """
     now = datetime.utcnow()
     user = db.get(BotUser, telegram_user_id)
@@ -42,23 +39,14 @@ def _claim_scan_slot(db: Session, telegram_user_id: int) -> bool:
         .on_conflict_do_nothing(index_elements=[BotUser.telegram_user_id])
     )
 
-    today = datetime.now(TASHKENT).date()
     stmt = (
         update(BotUser)
         .where(
             BotUser.telegram_user_id == telegram_user_id,
-            or_(
-                BotUser.quota_date.is_distinct_from(today),
-                BotUser.scan_count < settings.free_daily_scans,
-            ),
+            BotUser.free_scans_used < settings.free_total_scans,
         )
-        .values(
-            scan_count=case(
-                (BotUser.quota_date == today, BotUser.scan_count + 1), else_=1
-            ),
-            quota_date=today,
-        )
-        .returning(BotUser.scan_count)
+        .values(free_scans_used=BotUser.free_scans_used + 1)
+        .returning(BotUser.free_scans_used)
     )
     claimed = db.execute(stmt).first() is not None
     db.commit()
@@ -66,13 +54,12 @@ def _claim_scan_slot(db: Session, telegram_user_id: int) -> bool:
 
 
 def _release_scan_slot(db: Session, telegram_user_id: int) -> None:
-    """Give back a claimed slot when the scan itself fails, so a failed
-    attempt doesn't cost the user part of their daily quota."""
-    today = datetime.now(TASHKENT).date()
+    """Give back a claimed scan when the scan itself fails, so a failed attempt
+    doesn't eat one of the user's free scans."""
     db.execute(
         update(BotUser)
-        .where(BotUser.telegram_user_id == telegram_user_id, BotUser.quota_date == today)
-        .values(scan_count=func.greatest(BotUser.scan_count - 1, 0))
+        .where(BotUser.telegram_user_id == telegram_user_id)
+        .values(free_scans_used=func.greatest(BotUser.free_scans_used - 1, 0))
     )
     db.commit()
 
@@ -95,9 +82,9 @@ async def upload_receipt(
     if not _claim_scan_slot(db, tg_user.id):
         raise HTTPException(
             402,
-            f"Kunlik bepul limit tugadi ({settings.free_daily_scans}/"
-            f"{settings.free_daily_scans}). {settings.subscription_days} kunlik "
-            f"cheksiz obuna — {settings.subscription_stars} ⭐.",
+            f"Bepul {settings.free_total_scans} ta skan tugadi. "
+            f"{settings.subscription_days} kunlik cheksiz obuna — "
+            f"{settings.subscription_stars} ⭐.",
         )
 
     try:

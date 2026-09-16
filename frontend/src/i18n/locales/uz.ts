@@ -22,7 +22,8 @@ export default {
     subscribeBtn: "⭐ Obuna bo'lish",
     subscribeStars: "⭐ {{stars}} yulduzga {{days}} kunlik obuna",
     subActive: "Obuna faol — {{date}} gacha",
-    scansLeft: "Bugun bepul skan: {{left}}/{{total}}",
+    scansLeft: "Bepul skan: {{left}}/{{total}} qoldi",
+    freeUsedUp: "Bepul {{total}} ta skan tugadi. Davom etish uchun obuna kerak.",
   },
   scan: {
     title: "Hisob bo'luvchi",

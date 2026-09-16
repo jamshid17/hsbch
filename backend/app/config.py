@@ -19,9 +19,9 @@ class Settings(BaseSettings):
     # not a minor unit, so it goes into LabeledPrice.amount as-is.
     subscription_stars: int = 50
     subscription_days: int = 30
-    # Free receipt scans per Asia/Tashkent calendar day before a subscription
+    # Lifetime free receipt scans per user (not per day) before a subscription
     # is required.
-    free_daily_scans: int = 1
+    free_total_scans: int = 5
     # Comma-separated Telegram user ids allowed to run /refund.
     admin_telegram_ids: str = ""
 

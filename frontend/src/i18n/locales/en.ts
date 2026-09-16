@@ -22,7 +22,8 @@ export default {
     subscribeBtn: "⭐ Subscribe",
     subscribeStars: "⭐ Subscribe for {{stars}} stars / {{days}} days",
     subActive: "Subscription active — until {{date}}",
-    scansLeft: "Free scans today: {{left}}/{{total}}",
+    scansLeft: "Free scans left: {{left}}/{{total}}",
+    freeUsedUp: "Your {{total}} free scans are used up. A subscription unlocks more.",
   },
   scan: {
     title: "Bill Splitter",

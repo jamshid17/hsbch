@@ -45,32 +45,40 @@ export default function EntryPage() {
         {t("entry.joinBtn")}
       </button>
 
-      {me?.is_subscribed ? (
+      {me?.is_subscribed && (
         <p style={{ color: "var(--hint)", fontSize: 14, textAlign: "center" }}>
           {t("entry.subActive", { date: subUntil })}
         </p>
-      ) : (
+      )}
+
+      {/* Free scans left — no upsell while the user still has some. */}
+      {me && !me.is_subscribed && me.scans_left > 0 && (
+        <p style={{ color: "var(--hint)", fontSize: 13, textAlign: "center" }}>
+          {t("entry.scansLeft", {
+            left: me.scans_left,
+            total: me.free_total_scans,
+          })}
+        </p>
+      )}
+
+      {/* Out of free scans: this is where the subscription is offered. */}
+      {me && !me.is_subscribed && me.scans_left === 0 && (
         <>
+          <p style={{ color: "var(--hint)", fontSize: 13, textAlign: "center" }}>
+            {t("entry.freeUsedUp", { total: me.free_total_scans })}
+          </p>
           <button
-            className="btn btn-ghost"
+            className="btn"
             disabled={subState === "opening"}
             onClick={subscribe}
           >
             {t("entry.subscribeStars", {
-              stars: me?.price_stars ?? 50,
-              days: me?.subscription_days ?? 30,
+              stars: me.price_stars,
+              days: me.subscription_days,
             })}
           </button>
-          {me && (
-            <p style={{ color: "var(--hint)", fontSize: 13, textAlign: "center" }}>
-              {t("entry.scansLeft", {
-                left: me.scans_left,
-                total: me.free_daily_scans,
-              })}
-            </p>
-          )}
 
-          {me?.card && (
+          {me.card && (
             <>
               <div className="or-divider">{t("card.or")}</div>
               <CardPayment card={me.card} />

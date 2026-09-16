@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from app.config import settings
 from app.db import get_db
@@ -12,8 +11,6 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["payments"])
-
-TASHKENT = ZoneInfo("Asia/Tashkent")
 
 
 @router.get("/me")
@@ -29,9 +26,8 @@ def get_me(
     subscribed = bool(
         user and user.subscription_until and user.subscription_until > now
     )
-    today = datetime.now(TASHKENT).date()
-    used = user.scan_count if user and user.quota_date == today else 0
-    scans_left = max(settings.free_daily_scans - used, 0)
+    used = user.free_scans_used if user else 0
+    scans_left = max(settings.free_total_scans - used, 0)
 
     # None (not an empty object) when card payments aren't configured, so the
     # client has a single flag to branch on.
@@ -51,8 +47,8 @@ def get_me(
         "subscription_until": (
             user.subscription_until.isoformat() if subscribed else None
         ),
-        "scans_left": settings.free_daily_scans if subscribed else scans_left,
-        "free_daily_scans": settings.free_daily_scans,
+        "scans_left": settings.free_total_scans if subscribed else scans_left,
+        "free_total_scans": settings.free_total_scans,
         "price_stars": settings.subscription_stars,
         "subscription_days": settings.subscription_days,
         "card": card,

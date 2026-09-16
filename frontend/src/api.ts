@@ -105,7 +105,7 @@ export interface MeOut {
   is_subscribed: boolean;
   subscription_until: string | null;
   scans_left: number;
-  free_daily_scans: number;
+  free_total_scans: number;
   price_stars: number;
   subscription_days: number;
   card: {

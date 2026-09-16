@@ -1,9 +1,8 @@
 import uuid
-from datetime import date, datetime
+from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
-    Date,
     DateTime,
     Enum,
     ForeignKey,
@@ -123,9 +122,9 @@ class BotUser(Base):
     __tablename__ = "bot_users"
 
     telegram_user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    scan_count: Mapped[int] = mapped_column(nullable=False, default=0)
-    # Asia/Tashkent calendar date scan_count applies to; reset lazily on read.
-    quota_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Free scans this user has spent in total — never reset; once it reaches
+    # settings.free_total_scans only a subscription unlocks further scans.
+    free_scans_used: Mapped[int] = mapped_column(nullable=False, default=0)
     # UTC instant the subscription lapses; NULL or past = free tier.
     subscription_until: Mapped[datetime | None] = mapped_column(
         DateTime, nullable=True
