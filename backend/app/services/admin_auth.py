@@ -12,7 +12,7 @@ ordinary admins like anyone promoted from the panel.
 """
 
 from app.config import settings
-from app.db import get_db
+from app.db import AsyncSessionLocal, get_db
 from app.models import BotUser
 from app.services.telegram_auth import TelegramUser, get_tg_user
 from fastapi import Depends, HTTPException
@@ -31,6 +31,16 @@ def is_admin(db: Session, telegram_user_id: int) -> bool:
         return True
     user = db.get(BotUser, telegram_user_id)
     return bool(user and user.is_admin)
+
+
+async def is_admin_async(telegram_user_id: int) -> bool:
+    """Same rule as is_admin(), for the bot handlers — they run in the event
+    loop and must not touch the blocking sync session."""
+    if is_super_admin(telegram_user_id):
+        return True
+    async with AsyncSessionLocal() as db:
+        user = await db.get(BotUser, telegram_user_id)
+        return bool(user and user.is_admin)
 
 
 def require_admin(

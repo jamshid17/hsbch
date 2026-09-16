@@ -1,6 +1,5 @@
 import logging
-from datetime import date, datetime, timedelta
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta
 
 from app.config import settings
 from app.db import get_db
@@ -8,6 +7,8 @@ from app.models import BotUser, Payment, ReceiptScan
 from app.models import Session as SessionModel
 from app.services.admin_auth import is_super_admin, require_admin
 from app.services.telegram_auth import TelegramUser
+from app.timeutil import day_start_utc as _day_start_utc
+from app.timeutil import today_local as _today
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import Date, case, cast, func, or_, select
@@ -16,21 +17,6 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-
-TASHKENT = ZoneInfo("Asia/Tashkent")
-
-
-def _today() -> date:
-    return datetime.now(TASHKENT).date()
-
-
-def _day_start_utc(days_ago: int = 0) -> datetime:
-    """UTC instant that Tashkent's calendar day started, `days_ago` days back —
-    stored timestamps are UTC but the business day is local."""
-    local_midnight = datetime.combine(
-        _today() - timedelta(days=days_ago), datetime.min.time(), tzinfo=TASHKENT
-    )
-    return local_midnight.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
 
 
 @router.get("/stats")

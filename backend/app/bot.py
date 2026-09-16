@@ -15,6 +15,8 @@ from aiogram.types import (
 )
 from sqlalchemy import select
 
+from app.bot_admin import router as admin_router
+from app.bot_admin import sync_admin_commands
 from app.calculator import calculate_summary
 from app.config import settings
 from app.db import AsyncSessionLocal
@@ -25,6 +27,9 @@ bot = Bot(token=settings.bot_token)
 dp = Dispatcher()
 router = Router()
 dp.include_router(router)
+# Admin-only screens over the database. Its own router-level filter drops
+# everyone else's updates, so ordering against the public handlers is safe.
+dp.include_router(admin_router)
 
 
 @router.message(CommandStart())
@@ -36,6 +41,10 @@ async def cmd_start(message: Message, command: CommandObject):
             web_app=WebAppInfo(url=settings.webapp_url),
         ),
     )
+
+    # Keeps the ⌘ menu in step with who is an admin *now* — granted on this
+    # chat only, and taken away again the next /start after a demotion.
+    is_admin = await sync_admin_commands(bot, message.chat.id, message.from_user.id)
 
     raw_arg = (command.args or "").strip()
 
@@ -61,7 +70,10 @@ async def cmd_start(message: Message, command: CommandObject):
         )
         return
 
-    await message.answer("Tap the menu button below to open the bill splitter.")
+    text = "Tap the menu button below to open the bill splitter."
+    if is_admin:
+        text += "\n\n🗄 Admin: /admin — bazani shu yerdan kuzatib turasiz."
+    await message.answer(text)
 
 
 @router.inline_query()
