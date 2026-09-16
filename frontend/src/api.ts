@@ -155,6 +155,44 @@ export interface AdminUser {
   is_super_admin: boolean;
 }
 
+/** Enough of a bot_users row to label a payment or a session. */
+export interface AdminUserBrief {
+  telegram_user_id: number;
+  first_name: string | null;
+  username: string | null;
+}
+
+export interface AdminPayment {
+  id: string;
+  amount: number;
+  currency: string;
+  method: string;
+  granted_by: number | null;
+  note: string | null;
+  refunded_at: string | null;
+  created_at: string | null;
+  user: AdminUserBrief;
+}
+
+export interface AdminSession {
+  id: string;
+  code: string;
+  status: string;
+  title: string | null;
+  currency: string;
+  assignment_mode: string;
+  items_count: number;
+  people_count: number;
+  created_at: string | null;
+  host: AdminUserBrief;
+}
+
+export interface AdminTables {
+  tables: { name: string; rows: number }[];
+  db_size: string;
+  pg_version: string;
+}
+
 export const api = {
   // Validates the Telegram initData (sent via the X-Telegram-Init-Data header
   // by authHeaders()) and returns the authenticated user.
@@ -176,6 +214,29 @@ export const api = {
     q.set("offset", String(params.offset ?? 0));
     return request<{ total: number; users: AdminUser[] }>(`/admin/users?${q}`);
   },
+
+  adminPayments: (params: { limit?: number; offset?: number } = {}) => {
+    const q = new URLSearchParams({
+      limit: String(params.limit ?? 20),
+      offset: String(params.offset ?? 0),
+    });
+    return request<{ total: number; revenue_total: number; payments: AdminPayment[] }>(
+      `/admin/payments?${q}`,
+    );
+  },
+
+  adminSessions: (params: { limit?: number; offset?: number } = {}) => {
+    const q = new URLSearchParams({
+      limit: String(params.limit ?? 20),
+      offset: String(params.offset ?? 0),
+    });
+    return request<{ total: number; sessions: AdminSession[] }>(`/admin/sessions?${q}`);
+  },
+
+  adminTables: () => request<AdminTables>("/admin/tables"),
+
+  adminUserPayments: (userId: number) =>
+    request<AdminPayment[]>(`/admin/users/${userId}/payments`),
 
   adminGrant: (userId: number, days: number) =>
     request<{ subscription_until: string; days_added: number }>(

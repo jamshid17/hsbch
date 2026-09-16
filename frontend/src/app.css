@@ -1141,3 +1141,104 @@ input:focus {
   flex-shrink: 0;
   padding-inline: 14px;
 }
+
+/* ── Admin tabs ── */
+/* Scrolls sideways rather than wrapping: four labels don't fit on a narrow
+   phone, and a second row would push the content below the fold. */
+.admin-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -16px;
+  padding: 2px 16px 4px;
+}
+
+.admin-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.admin-tab {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: none;
+  background: var(--surface);
+  color: var(--hint);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.admin-tab-active {
+  background: var(--button);
+  color: var(--button-text);
+}
+
+.muted-line {
+  color: var(--hint);
+  font-size: 13px;
+  margin: 0;
+}
+
+/* Inline disclosure inside a user row — a link, not a button, so it doesn't
+   compete with the subscription actions next to it. */
+.link-toggle {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--link);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.user-payments {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+  padding-left: 8px;
+  border-left: 2px solid var(--bg);
+}
+
+/* ── Admin: table row counts ── */
+.db-table {
+  gap: 0;
+  padding: 4px 14px;
+}
+
+.db-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+}
+
+.db-row + .db-row {
+  border-top: 1px solid var(--bg);
+}
+
+.db-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.db-row-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.db-row-name {
+  font-size: 11px;
+  color: var(--hint);
+}
+
+.db-row-count {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}

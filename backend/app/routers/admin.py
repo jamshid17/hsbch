@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from app.config import settings
 from app.db import get_db
-from app.models import BotUser, Payment, ReceiptScan
+from app.models import Assignment, BotUser, Item, Payment, Person, ReceiptScan
 from app.models import Session as SessionModel
 from app.services.admin_auth import is_super_admin, require_admin
 from app.services.telegram_auth import TelegramUser
@@ -203,6 +203,142 @@ def list_users(
             }
             for u in users
         ],
+    }
+
+
+def _user_brief(user: BotUser | None, telegram_user_id: int) -> dict:
+    """Just enough of a bot_users row to label a payment or a session — the
+    id always resolves, the name only if they have ever opened the app."""
+    return {
+        "telegram_user_id": telegram_user_id,
+        "first_name": user.first_name if user else None,
+        "username": user.username if user else None,
+    }
+
+
+@router.get("/payments")
+def list_payments(
+    db: Session = Depends(get_db),
+    _: TelegramUser = Depends(require_admin),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    """Every payment, newest first — the ledger behind the revenue tile."""
+    total = db.execute(select(func.count()).select_from(Payment)).scalar_one()
+    revenue_total = db.execute(
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(
+            Payment.refunded_at.is_(None)
+        )
+    ).scalar_one()
+
+    rows = db.execute(
+        select(Payment, BotUser)
+        .outerjoin(BotUser, BotUser.telegram_user_id == Payment.telegram_user_id)
+        .order_by(Payment.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    ).all()
+
+    return {
+        "total": total,
+        "revenue_total": int(revenue_total),
+        "payments": [
+            {
+                "id": str(p.id),
+                "amount": p.amount,
+                "currency": p.currency,
+                "method": p.method,
+                "granted_by": p.granted_by,
+                "note": p.note,
+                "refunded_at": p.refunded_at.isoformat() if p.refunded_at else None,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+                "user": _user_brief(u, p.telegram_user_id),
+            }
+            for p, u in rows
+        ],
+    }
+
+
+@router.get("/sessions")
+def list_sessions(
+    db: Session = Depends(get_db),
+    _: TelegramUser = Depends(require_admin),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    """Recent bills, newest first. The item and people counts are correlated
+    subqueries rather than a join, so a session with no items still shows up."""
+    total = db.execute(select(func.count()).select_from(SessionModel)).scalar_one()
+
+    items_count = (
+        select(func.count()).where(Item.session_id == SessionModel.id).scalar_subquery()
+    )
+    people_count = (
+        select(func.count())
+        .where(Person.session_id == SessionModel.id)
+        .scalar_subquery()
+    )
+
+    rows = db.execute(
+        select(SessionModel, items_count, people_count, BotUser)
+        .outerjoin(BotUser, BotUser.telegram_user_id == SessionModel.telegram_chat_id)
+        .order_by(SessionModel.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    ).all()
+
+    return {
+        "total": total,
+        "sessions": [
+            {
+                "id": str(s.id),
+                "code": s.code,
+                "status": s.status,
+                "title": s.title,
+                "currency": s.currency,
+                "assignment_mode": s.assignment_mode,
+                "items_count": n_items,
+                "people_count": n_people,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+                "host": _user_brief(host, s.telegram_chat_id),
+            }
+            for s, n_items, n_people, host in rows
+        ],
+    }
+
+
+@router.get("/tables")
+def list_tables(
+    db: Session = Depends(get_db),
+    _: TelegramUser = Depends(require_admin),
+):
+    """Row counts per table, plus how much disk the whole thing takes — the
+    "is anything actually in there" view you'd otherwise open psql for."""
+    models = [
+        ("bot_users", BotUser),
+        ("sessions", SessionModel),
+        ("items", Item),
+        ("people", Person),
+        ("assignments", Assignment),
+        ("payments", Payment),
+        ("receipt_scans", ReceiptScan),
+    ]
+    return {
+        "tables": [
+            {
+                "name": name,
+                "rows": db.execute(
+                    select(func.count()).select_from(model)
+                ).scalar_one(),
+            }
+            for name, model in models
+        ],
+        "db_size": db.execute(
+            select(func.pg_size_pretty(func.pg_database_size(settings.postgres_db)))
+        ).scalar_one(),
+        "pg_version": db.execute(
+            select(func.current_setting("server_version"))
+        ).scalar_one(),
     }
 
 

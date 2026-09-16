@@ -16,3 +16,42 @@ export function clampQty(value: string): string {
   if (n > MAX_QTY) return String(MAX_QTY);
   return value;
 }
+
+/* The admin API sends timestamps as naive UTC ISO strings (no offset), so
+ * these helpers append "Z" before parsing — otherwise a browser in UTC+5
+ * reads 09:00 UTC as 09:00 local and every "bugun" is five hours off. */
+function parse(iso: string): Date {
+  return new Date(/[Z+]|-\d\d:\d\d$/.test(iso) ? iso : `${iso}Z`);
+}
+
+/** Thousands-separated integer: 25000 → "25 000". */
+export function fmtNum(n: number): string {
+  return n.toLocaleString("ru-RU");
+}
+
+/** dd.mm.yyyy — the app has three UI languages, so month names are avoided. */
+export function fmtDate(iso: string): string {
+  const d = parse(iso);
+  return [d.getDate(), d.getMonth() + 1, d.getFullYear()]
+    .map((v, i) => (i < 2 ? String(v).padStart(2, "0") : v))
+    .join(".");
+}
+
+/** dd.mm.yyyy hh:mm, in the viewer's own timezone. */
+export function fmtDateTime(iso: string | null): string {
+  if (!iso) return "—";
+  const d = parse(iso);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${fmtDate(iso)} ${hh}:${mm}`;
+}
+
+/** "bugun" / "3 kun oldin" / a plain date once it stops being recent. */
+export function relDate(iso: string | null): string {
+  if (!iso) return "—";
+  const days = Math.floor((Date.now() - parse(iso).getTime()) / 86400000);
+  if (days === 0) return "bugun";
+  if (days === 1) return "kecha";
+  if (days < 30) return `${days} kun oldin`;
+  return fmtDate(iso);
+}

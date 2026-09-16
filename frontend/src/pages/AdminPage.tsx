@@ -6,6 +6,10 @@ import type { AdminUser } from "../api";
 import DailyScansChart from "../components/DailyScansChart";
 import ConfirmSheet from "../components/ConfirmSheet";
 import AddAdminForm from "../components/AddAdminForm";
+import AdminPayments from "../components/AdminPayments";
+import AdminSessions from "../components/AdminSessions";
+import AdminTables from "../components/AdminTables";
+import { fmtDate, fmtDateTime, fmtNum, relDate } from "../lib/format";
 
 const FILTERS = [
   { key: "all", label: "Hammasi" },
@@ -16,29 +20,24 @@ const FILTERS = [
   { key: "exhausted", label: "Limiti tugagan", paidOnly: true },
 ] as const;
 
-function fmt(n: number) {
-  return n.toLocaleString("ru-RU");
-}
+const TABS = [
+  { key: "overview", label: "📊 Umumiy" },
+  { key: "payments", label: "💳 To'lovlar" },
+  { key: "sessions", label: "🧾 Sessiyalar" },
+  { key: "tables", label: "🗄 Baza" },
+] as const;
 
-/** dd.mm.yyyy — the app has three UI languages, so month names are avoided. */
-function fmtDate(iso: string) {
-  const d = new Date(iso);
-  return [d.getDate(), d.getMonth() + 1, d.getFullYear()]
-    .map((v, i) => (i < 2 ? String(v).padStart(2, "0") : v))
-    .join(".");
-}
+type TabKey = (typeof TABS)[number]["key"];
 
-function relDate(iso: string | null) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
-  if (days === 0) return "bugun";
-  if (days === 1) return "kecha";
-  if (days < 30) return `${days} kun oldin`;
-  return fmtDate(iso);
-}
-
-function StatTile({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function StatTile({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
   return (
     <div className="stat-tile">
       <div className="stat-label">{label}</div>
@@ -50,11 +49,28 @@ function StatTile({ label, value, hint }: { label: string; value: string; hint?:
 
 type PendingAction = "grant" | "extend" | "revoke" | "promote" | "demote";
 
-function UserRow({ user, paid, meId }: { user: AdminUser; paid: boolean; meId?: number }) {
+function UserRow({
+  user,
+  paid,
+  meId,
+}: {
+  user: AdminUser;
+  paid: boolean;
+  meId?: number;
+}) {
   const queryClient = useQueryClient();
   // Every write goes through a confirmation sheet — these rows sit close
   // together on a phone and all three actions change what someone paid for.
   const [pending, setPending] = useState<PendingAction | null>(null);
+  // Payment history is collapsed by default and only fetched once opened —
+  // a list of 50 users shouldn't fire 50 requests nobody asked for.
+  const [showPayments, setShowPayments] = useState(false);
+
+  const payments = useQuery({
+    queryKey: ["admin", "user-payments", user.telegram_user_id],
+    queryFn: () => api.adminUserPayments(user.telegram_user_id),
+    enabled: showPayments,
+  });
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
@@ -91,8 +107,11 @@ function UserRow({ user, paid, meId }: { user: AdminUser; paid: boolean; meId?: 
   const canToggleAdmin =
     !user.is_super_admin && !(user.is_admin && user.telegram_user_id === meId);
 
-  const name = user.first_name || (user.username ? `@${user.username}` : "Noma'lum");
-  const until = user.subscription_until ? fmtDate(user.subscription_until) : null;
+  const name =
+    user.first_name || (user.username ? `@${user.username}` : "Noma'lum");
+  const until = user.subscription_until
+    ? fmtDate(user.subscription_until)
+    : null;
 
   return (
     <div className="user-row">
@@ -108,7 +127,9 @@ function UserRow({ user, paid, meId }: { user: AdminUser; paid: boolean; meId?: 
               {user.is_super_admin ? "asosiy admin" : "admin"}
             </span>
           )}
-          {paid && user.is_subscribed && <span className="badge badge-ok">obuna</span>}
+          {paid && user.is_subscribed && (
+            <span className="badge badge-ok">obuna</span>
+          )}
           {paid &&
             !user.is_subscribed &&
             user.free_scans_used >= user.free_total_scans && (
@@ -127,6 +148,32 @@ function UserRow({ user, paid, meId }: { user: AdminUser; paid: boolean; meId?: 
           {relDate(user.last_seen_at)}
           {paid && user.is_subscribed && until ? ` · ${until} gacha` : ""}
         </div>
+
+        <button
+          className="link-toggle"
+          onClick={() => setShowPayments((v) => !v)}
+          aria-expanded={showPayments}
+        >
+          To'lovlar tarixi {showPayments ? "▴" : "▾"}
+        </button>
+
+        {showPayments && (
+          <div className="user-payments">
+            {payments.isLoading && (
+              <span className="user-meta">Yuklanmoqda…</span>
+            )}
+            {payments.data?.length === 0 && (
+              <span className="user-meta">To'lov qilinmagan.</span>
+            )}
+            {payments.data?.map((p) => (
+              <div className="user-meta" key={p.id}>
+                {fmtNum(p.amount)} {p.currency} · {p.method} ·{" "}
+                {fmtDateTime(p.created_at)}
+                {p.note ? ` · ${p.note}` : ""}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="user-actions">
@@ -235,28 +282,34 @@ function UserRow({ user, paid, meId }: { user: AdminUser; paid: boolean; meId?: 
 
 export default function AdminPage() {
   const navigate = useNavigate();
+  const [tab, setTab] = useState<TabKey>("overview");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("all");
   const [limit, setLimit] = useState(20);
 
-  const { data: me } = useQuery({ queryKey: ["me"], queryFn: () => api.getMe() });
+  const { data: me } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => api.getMe(),
+  });
 
   // Subscription stats, filters and row actions all hang off this one flag.
   const paid = !!me?.subscriptions_enabled;
-  const filters = FILTERS.filter((f) => paid || !("paidOnly" in f && f.paidOnly));
+  const filters = FILTERS.filter(
+    (f) => paid || !("paidOnly" in f && f.paidOnly),
+  );
   const activeFilter = filters.some((f) => f.key === filter) ? filter : "all";
 
   const { data: stats } = useQuery({
     queryKey: ["admin", "stats"],
     queryFn: () => api.adminStats(),
-    enabled: me?.is_admin === true,
+    enabled: me?.is_admin === true && tab === "overview",
     refetchInterval: 30000,
   });
 
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin", "users", search, activeFilter, limit],
     queryFn: () => api.adminUsers({ search, filter: activeFilter, limit }),
-    enabled: me?.is_admin === true,
+    enabled: me?.is_admin === true && tab === "overview",
   });
 
   // Non-admins never see this screen, even by typing the URL.
@@ -269,100 +322,132 @@ export default function AdminPage() {
     <div className="page">
       <h1>🛠 Admin</h1>
 
-      {!paid && (
-        <p className="notice">
-          Obuna tizimi hozircha o'chirilgan — ilova hamma uchun to'liq bepul.
-          Skan limiti hisoblanmayapti va to'lov ekrani ko'rsatilmayapti.
-        </p>
-      )}
-
-      <div className="stat-grid">
-        <StatTile
-          label="Foydalanuvchilar"
-          value={fmt(stats?.users_total ?? 0)}
-          hint={stats ? `bugun +${stats.users_today} · 7 kun +${stats.users_week}` : undefined}
-        />
-        <StatTile
-          label="Skan · bugun"
-          value={fmt(stats?.scans_today ?? 0)}
-          hint={stats ? `7 kun: ${stats.scans_week}` : undefined}
-        />
-        <StatTile
-          label="Skan · jami"
-          value={fmt(stats?.scans_total ?? 0)}
-          hint={stats ? `${stats.sessions_total} sessiya` : undefined}
-        />
-        <StatTile
-          label="Adminlar"
-          value={fmt(stats?.admins_total ?? 0)}
-          hint="panelga kirish huquqi"
-        />
-        {paid && (
-          <>
-            <StatTile
-              label="Obunachilar"
-              value={fmt(stats?.subscribed ?? 0)}
-              hint={stats ? `${stats.exhausted} ta limiti tugagan` : undefined}
-            />
-            <StatTile
-              label="Bu oy tushum"
-              value={`${fmt(stats?.revenue_month ?? 0)} so'm`}
-              hint={stats ? `${stats.payments_month} ta to'lov` : undefined}
-            />
-            <StatTile
-              label="Obuna narxi"
-              value={`${fmt(stats?.price_uzs ?? 0)} so'm`}
-              hint="30 kun"
-            />
-          </>
-        )}
-      </div>
-
-      {stats && <DailyScansChart data={stats.daily_scans} />}
-
-      <h2 className="section-title">Adminlar</h2>
-      <AddAdminForm />
-
-      <h2 className="section-title">Foydalanuvchilar</h2>
-
-      <input
-        type="text"
-        placeholder="Ism, @username yoki ID bo'yicha qidirish"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
-
-      <div className="chip-row">
-        {filters.map((f) => (
+      <div className="admin-tabs">
+        {TABS.map((t) => (
           <button
-            key={f.key}
-            className={`chip ${activeFilter === f.key ? "chip-active" : ""}`}
-            onClick={() => setFilter(f.key)}
+            key={t.key}
+            className={`admin-tab ${tab === t.key ? "admin-tab-active" : ""}`}
+            onClick={() => setTab(t.key)}
           >
-            {f.label}
+            {t.label}
           </button>
         ))}
       </div>
 
-      {isLoading && <p style={{ color: "var(--hint)", fontSize: 14 }}>Yuklanmoqda…</p>}
+      {tab === "payments" && <AdminPayments />}
+      {tab === "sessions" && <AdminSessions />}
+      {tab === "tables" && <AdminTables />}
 
-      {users && (
+      {tab === "overview" && (
         <>
-          <p style={{ color: "var(--hint)", fontSize: 13, margin: 0 }}>
-            {users.total} ta topildi
-          </p>
-          {users.users.map((u) => (
-            <UserRow
-              key={u.telegram_user_id}
-              user={u}
-              paid={paid}
-              meId={me?.telegram_user_id}
+          {!paid && (
+            <p className="notice">
+              Obuna tizimi hozircha o'chirilgan — ilova hamma uchun to'liq
+              bepul. Skan limiti hisoblanmayapti va to'lov ekrani
+              ko'rsatilmayapti.
+            </p>
+          )}
+
+          <div className="stat-grid">
+            <StatTile
+              label="Foydalanuvchilar"
+              value={fmtNum(stats?.users_total ?? 0)}
+              hint={
+                stats
+                  ? `bugun +${stats.users_today} · 7 kun +${stats.users_week}`
+                  : undefined
+              }
             />
-          ))}
-          {users.users.length < users.total && (
-            <button className="btn btn-ghost" onClick={() => setLimit((l) => l + 20)}>
-              Yana yuklash
-            </button>
+            <StatTile
+              label="Skan · bugun"
+              value={fmtNum(stats?.scans_today ?? 0)}
+              hint={stats ? `7 kun: ${stats.scans_week}` : undefined}
+            />
+            <StatTile
+              label="Skan · jami"
+              value={fmtNum(stats?.scans_total ?? 0)}
+              hint={stats ? `${stats.sessions_total} sessiya` : undefined}
+            />
+            <StatTile
+              label="Adminlar"
+              value={fmtNum(stats?.admins_total ?? 0)}
+              hint="panelga kirish huquqi"
+            />
+            {paid && (
+              <>
+                <StatTile
+                  label="Obunachilar"
+                  value={fmtNum(stats?.subscribed ?? 0)}
+                  hint={
+                    stats ? `${stats.exhausted} ta limiti tugagan` : undefined
+                  }
+                />
+                <StatTile
+                  label="Bu oy tushum"
+                  value={`${fmtNum(stats?.revenue_month ?? 0)} so'm`}
+                  hint={stats ? `${stats.payments_month} ta to'lov` : undefined}
+                />
+                <StatTile
+                  label="Obuna narxi"
+                  value={`${fmtNum(stats?.price_uzs ?? 0)} so'm`}
+                  hint="30 kun"
+                />
+              </>
+            )}
+          </div>
+
+          {stats && <DailyScansChart data={stats.daily_scans} />}
+
+          <h2 className="section-title">Adminlar</h2>
+          <AddAdminForm />
+
+          <h2 className="section-title">Foydalanuvchilar</h2>
+
+          <input
+            type="text"
+            placeholder="Ism, @username yoki ID bo'yicha qidirish"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+
+          <div className="chip-row">
+            {filters.map((f) => (
+              <button
+                key={f.key}
+                className={`chip ${activeFilter === f.key ? "chip-active" : ""}`}
+                onClick={() => setFilter(f.key)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {isLoading && (
+            <p style={{ color: "var(--hint)", fontSize: 14 }}>Yuklanmoqda…</p>
+          )}
+
+          {users && (
+            <>
+              <p style={{ color: "var(--hint)", fontSize: 13, margin: 0 }}>
+                {users.total} ta topildi
+              </p>
+              {users.users.map((u) => (
+                <UserRow
+                  key={u.telegram_user_id}
+                  user={u}
+                  paid={paid}
+                  meId={me?.telegram_user_id}
+                />
+              ))}
+              {users.users.length < users.total && (
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => setLimit((l) => l + 20)}
+                >
+                  Yana yuklash
+                </button>
+              )}
+            </>
           )}
         </>
       )}
