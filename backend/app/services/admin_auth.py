@@ -1,10 +1,14 @@
 """Who counts as an admin.
 
-Two sources, deliberately: the ids in ADMIN_TELEGRAM_IDS are *root* admins —
-always in, never demotable, and the only thing standing between a fresh
-deployment and an unreachable panel. Everyone else is a normal admin stored in
-bot_users.is_admin, promoted and demoted from the dashboard with no .env edit
-and no restart.
+Admin access lives in bot_users.is_admin and is managed entirely from the
+dashboard. The one exception is the super admin — the first id in
+ADMIN_TELEGRAM_IDS — who is an admin whether or not the table says so and
+whom no other admin can demote. That single fixed point is what guarantees
+the panel can never end up with nobody able to open it.
+
+The remaining ids in ADMIN_TELEGRAM_IDS are only a seed: the migration that
+introduced the column wrote them into the table, and from then on they are
+ordinary admins like anyone promoted from the panel.
 """
 
 from app.config import settings
@@ -15,12 +19,15 @@ from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
 
 
-def is_root_admin(telegram_user_id: int) -> bool:
-    return telegram_user_id in settings.admin_ids
+def is_super_admin(telegram_user_id: int) -> bool:
+    return (
+        settings.super_admin_id is not None
+        and telegram_user_id == settings.super_admin_id
+    )
 
 
 def is_admin(db: Session, telegram_user_id: int) -> bool:
-    if is_root_admin(telegram_user_id):
+    if is_super_admin(telegram_user_id):
         return True
     user = db.get(BotUser, telegram_user_id)
     return bool(user and user.is_admin)

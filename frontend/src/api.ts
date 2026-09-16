@@ -150,8 +150,9 @@ export interface AdminUser {
   last_seen_at: string | null;
   created_at: string | null;
   is_admin: boolean;
-  /** Admin via ADMIN_TELEGRAM_IDS — can't be demoted from the panel. */
-  is_root_admin: boolean;
+  /** The owner account (first id in ADMIN_TELEGRAM_IDS) — no other admin can
+   * demote them. */
+  is_super_admin: boolean;
 }
 
 export const api = {
@@ -188,7 +189,7 @@ export const api = {
     }),
 
   adminSetAdmin: (userId: number, isAdmin: boolean) =>
-    request<{ is_admin: boolean; is_root_admin: boolean }>(
+    request<{ is_admin: boolean; is_super_admin: boolean }>(
       `/admin/users/${userId}/admin`,
       { method: "POST", body: JSON.stringify({ is_admin: isAdmin }) },
     ),

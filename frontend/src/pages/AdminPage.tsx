@@ -86,10 +86,10 @@ function UserRow({ user, paid, meId }: { user: AdminUser; paid: boolean; meId?: 
     },
   });
 
-  // A root admin comes from the server's env and has no in-app toggle; nobody
-  // can demote themselves out of the screen they're standing on.
+  // The super admin is the owner account and has no in-app toggle at all;
+  // nobody can demote themselves out of the screen they're standing on.
   const canToggleAdmin =
-    !user.is_root_admin && !(user.is_admin && user.telegram_user_id === meId);
+    !user.is_super_admin && !(user.is_admin && user.telegram_user_id === meId);
 
   const name = user.first_name || (user.username ? `@${user.username}` : "Noma'lum");
   const until = user.subscription_until ? fmtDate(user.subscription_until) : null;
@@ -100,8 +100,12 @@ function UserRow({ user, paid, meId }: { user: AdminUser; paid: boolean; meId?: 
         <div className="user-name">
           {name}
           {user.is_admin && (
-            <span className="badge badge-admin">
-              {user.is_root_admin ? "asosiy admin" : "admin"}
+            <span
+              className={`badge ${
+                user.is_super_admin ? "badge-super" : "badge-admin"
+              }`}
+            >
+              {user.is_super_admin ? "asosiy admin" : "admin"}
             </span>
           )}
           {paid && user.is_subscribed && <span className="badge badge-ok">obuna</span>}

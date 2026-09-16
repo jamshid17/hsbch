@@ -970,9 +970,16 @@ input:focus {
   background: color-mix(in srgb, #5b6ee1 22%, transparent);
 }
 
+/* The owner account. Distinct from a plain admin because it's the one row
+   with no action button — the colour explains the absence. */
+.badge-super {
+  background: color-mix(in srgb, #b8860b 22%, transparent);
+}
+
 .badge-ok,
 .badge-warn,
-.badge-admin {
+.badge-admin,
+.badge-super {
   color: var(--text);
 }
 
@@ -986,6 +993,10 @@ input:focus {
 
 .badge-admin::before {
   background: #5b6ee1;
+}
+
+.badge-super::before {
+  background: #b8860b;
 }
 
 /* Standing state the admin should read once and stop noticing — e.g. "the

@@ -26,9 +26,11 @@ class Settings(BaseSettings):
     # Lifetime free receipt scans per user (not per day) before a subscription
     # is required. Only enforced while subscriptions_enabled is true.
     free_total_scans: int = 5
-    # Comma-separated Telegram user ids that are always admins and can never be
-    # demoted from the panel — the bootstrap that keeps the panel reachable.
-    # Everyone else is promoted/demoted in-app via bot_users.is_admin.
+    # Comma-separated Telegram user ids seeded as admins on first deploy.
+    # The FIRST id is the super admin: always an admin, and the one account no
+    # other admin can demote. The rest are ordinary admins from then on —
+    # after the seed, bot_users.is_admin is the source of truth and everything
+    # is managed from the panel rather than here.
     admin_telegram_ids: str = ""
 
     # Receipt upload cap. The Mini App compresses to under 2 MB before
@@ -55,10 +57,23 @@ class Settings(BaseSettings):
         return self.max_upload_mb * 1024 * 1024
 
     @property
-    def admin_ids(self) -> set[int]:
-        return {
+    def admin_ids(self) -> list[int]:
+        """Seed admins, in the order they were configured."""
+        return [
             int(part) for part in self.admin_telegram_ids.split(",") if part.strip()
-        }
+        ]
+
+    @property
+    def super_admin_id(self) -> int | None:
+        """The first configured id — the owner account.
+
+        It is an admin whether or not the database says so, and no other
+        admin can take that away. Everything else about admin access lives in
+        bot_users.is_admin; this is the one rule the panel can't rewrite, so
+        there is always exactly one account that can't be locked out.
+        """
+        ids = self.admin_ids
+        return ids[0] if ids else None
 
     @property
     def database_url(self) -> str:

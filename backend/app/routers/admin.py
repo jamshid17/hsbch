@@ -6,7 +6,7 @@ from app.config import settings
 from app.db import get_db
 from app.models import BotUser, Payment, ReceiptScan
 from app.models import Session as SessionModel
-from app.services.admin_auth import is_root_admin, require_admin
+from app.services.admin_auth import is_super_admin, require_admin
 from app.services.telegram_auth import TelegramUser
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -116,13 +116,17 @@ def get_stats(
         "payments_month": payments_month,
         "price_uzs": settings.subscription_price_uzs,
         "daily_scans": daily,
-        # Admins promoted in-app, plus the root ids from the env that never
-        # appear in bot_users until they've opened the app.
-        "admins_total": len(settings.admin_ids | {
-            u for u in db.execute(
-                select(BotUser.telegram_user_id).where(BotUser.is_admin.is_(True))
-            ).scalars()
-        }),
+        # Admins in the table, plus the super admin — who is one by
+        # configuration and may not have a row at all yet.
+        "admins_total": len(
+            {
+                u
+                for u in db.execute(
+                    select(BotUser.telegram_user_id).where(BotUser.is_admin.is_(True))
+                ).scalars()
+            }
+            | ({settings.super_admin_id} if settings.super_admin_id else set())
+        ),
         "subscriptions_enabled": settings.subscriptions_enabled,
     }
 
@@ -166,12 +170,12 @@ def list_users(
     elif filter == "active":
         stmt = stmt.where(BotUser.last_seen_at >= _day_start_utc(6))
     elif filter == "admins":
-        # Root admins are admins by id alone, so they belong here even with the
-        # column still false (e.g. promoted via env after the row was created).
+        # The super admin is an admin by configuration, so they belong here
+        # even if their row somehow has the column false.
         stmt = stmt.where(
             or_(
                 BotUser.is_admin.is_(True),
-                BotUser.telegram_user_id.in_(settings.admin_ids or {0}),
+                BotUser.telegram_user_id == (settings.super_admin_id or 0),
             )
         )
 
@@ -207,9 +211,9 @@ def list_users(
                 ),
                 "last_seen_at": u.last_seen_at.isoformat() if u.last_seen_at else None,
                 "created_at": u.created_at.isoformat() if u.created_at else None,
-                "is_admin": bool(u.is_admin) or is_root_admin(u.telegram_user_id),
-                # Root admins come from the env and have no in-app toggle.
-                "is_root_admin": is_root_admin(u.telegram_user_id),
+                "is_admin": bool(u.is_admin) or is_super_admin(u.telegram_user_id),
+                # The owner account — shown differently and never demotable.
+                "is_super_admin": is_super_admin(u.telegram_user_id),
             }
             for u in users
         ],
@@ -326,17 +330,17 @@ def set_admin(
     """Promote someone to admin, or take it away — the whole point being that
     this no longer needs an .env edit and a redeploy.
 
-    Two things are refused outright, both to keep the panel reachable:
-    a root admin (an id in ADMIN_TELEGRAM_IDS) can't be demoted, since the env
-    would keep letting them back in anyway and the button would be a lie; and
-    nobody can demote themselves, which is the one mistake that locks the
-    current session out of the screen it was clicking on.
+    Two things are refused outright, both to keep the panel reachable: the
+    super admin can't be demoted by anyone, themselves included — they are the
+    owner account and the guarantee that someone can always get in; and nobody
+    can demote themselves, which is the one mistake that locks the current
+    session out of the screen it was clicking on.
     """
-    if is_root_admin(telegram_user_id) and not body.is_admin:
+    if is_super_admin(telegram_user_id) and not body.is_admin:
         raise HTTPException(
             400,
-            "Bu foydalanuvchi asosiy admin (server sozlamasida) — "
-            "panel orqali olib tashlab bo'lmaydi.",
+            "Bu foydalanuvchi — asosiy admin. Uni adminlikdan olib "
+            "tashlab bo'lmaydi.",
         )
     if telegram_user_id == admin.id and not body.is_admin:
         raise HTTPException(
@@ -361,6 +365,6 @@ def set_admin(
     )
     return {
         "telegram_user_id": telegram_user_id,
-        "is_admin": bool(user.is_admin) or is_root_admin(telegram_user_id),
-        "is_root_admin": is_root_admin(telegram_user_id),
+        "is_admin": bool(user.is_admin) or is_super_admin(telegram_user_id),
+        "is_super_admin": is_super_admin(telegram_user_id),
     }
