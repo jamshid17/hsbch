@@ -18,6 +18,18 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/sessions", tags=["receipt"])
 
+# What the upload endpoint accepts. Narrower than "image/*": HEIC and friends
+# are images the vision API can't read, and the Mini App already converts
+# everything it can decode to JPEG before uploading.
+ALLOWED_UPLOAD_TYPES = {
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+}
+ALLOWED_UPLOAD_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif")
+
 
 def _claim_scan_slot(db: Session, telegram_user_id: int) -> bool:
     """Atomically spend one of this user's lifetime free scans.
@@ -27,6 +39,12 @@ def _claim_scan_slot(db: Session, telegram_user_id: int) -> bool:
     is what makes this safe under concurrent requests from the same user —
     there's no separate read-then-write race window.
     """
+    # Paid tier switched off — every scan is free and nothing is spent, so
+    # turning subscriptions back on later finds the counters where it left
+    # them rather than exhausted by months of free use.
+    if not settings.subscriptions_enabled:
+        return True
+
     now = datetime.utcnow()
     user = db.get(BotUser, telegram_user_id)
     if user and user.subscription_until and user.subscription_until > now:
@@ -56,6 +74,8 @@ def _claim_scan_slot(db: Session, telegram_user_id: int) -> bool:
 def _release_scan_slot(db: Session, telegram_user_id: int) -> None:
     """Give back a claimed scan when the scan itself fails, so a failed attempt
     doesn't eat one of the user's free scans."""
+    if not settings.subscriptions_enabled:
+        return
     db.execute(
         update(BotUser)
         .where(BotUser.telegram_user_id == telegram_user_id)
@@ -88,6 +108,33 @@ def _log_scan(db: Session, telegram_user_id: int, session_id: uuid.UUID) -> None
     )
 
 
+def _reject_non_image(file: UploadFile) -> None:
+    """Refuse anything that isn't a photo before a single byte is read.
+
+    The picker is restricted to images client-side, but "Choose file" on
+    desktop and some Android file managers ignore the accept attribute, and a
+    PDF reaching the vision API is a guaranteed failure that the user only
+    finds out about after waiting. Content-Type comes from the client and can
+    be spoofed, so the extension is checked too — this is a usability guard,
+    not a security boundary; scan_receipt() still validates the real format.
+    """
+    media_type = (file.content_type or "").split(";")[0].strip().lower()
+    if media_type and media_type not in ALLOWED_UPLOAD_TYPES:
+        raise HTTPException(
+            415,
+            "Faqat rasm yuklash mumkin (JPEG, PNG, WEBP). "
+            "PDF va boshqa fayllar qo'llab-quvvatlanmaydi.",
+        )
+
+    name = (file.filename or "").lower()
+    if "." in name and not name.endswith(ALLOWED_UPLOAD_EXTENSIONS):
+        raise HTTPException(
+            415,
+            "Faqat rasm yuklash mumkin (JPEG, PNG, WEBP). "
+            "PDF va boshqa fayllar qo'llab-quvvatlanmaydi.",
+        )
+
+
 @router.post("/{session_id}/receipt", response_model=ScanResult)
 async def upload_receipt(
     session_id: uuid.UUID,
@@ -99,9 +146,17 @@ async def upload_receipt(
     if not session:
         raise HTTPException(404, "Session not found")
 
+    _reject_non_image(file)
+
     image_bytes = await file.read()
     if not image_bytes:
         raise HTTPException(400, "Bo'sh fayl yuborildi.")
+    if len(image_bytes) > settings.max_upload_bytes:
+        raise HTTPException(
+            413,
+            f"Rasm juda katta ({len(image_bytes) / 1024 / 1024:.1f} MB). "
+            f"Eng ko'pi {settings.max_upload_mb} MB.",
+        )
 
     if not _claim_scan_slot(db, tg_user.id):
         raise HTTPException(

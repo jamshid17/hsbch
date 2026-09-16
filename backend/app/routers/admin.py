@@ -6,7 +6,8 @@ from app.config import settings
 from app.db import get_db
 from app.models import BotUser, Payment, ReceiptScan
 from app.models import Session as SessionModel
-from app.services.telegram_auth import TelegramUser, get_tg_user
+from app.services.admin_auth import is_root_admin, require_admin
+from app.services.telegram_auth import TelegramUser
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import Date, case, cast, func, or_, select
@@ -17,14 +18,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 TASHKENT = ZoneInfo("Asia/Tashkent")
-
-
-def require_admin(tg_user: TelegramUser = Depends(get_tg_user)) -> TelegramUser:
-    """Every admin endpoint depends on this. 404 rather than 403 so the panel
-    doesn't advertise its own existence to non-admins."""
-    if tg_user.id not in settings.admin_ids:
-        raise HTTPException(404, "Not found")
-    return tg_user
 
 
 def _today() -> date:
@@ -123,6 +116,14 @@ def get_stats(
         "payments_month": payments_month,
         "price_uzs": settings.subscription_price_uzs,
         "daily_scans": daily,
+        # Admins promoted in-app, plus the root ids from the env that never
+        # appear in bot_users until they've opened the app.
+        "admins_total": len(settings.admin_ids | {
+            u for u in db.execute(
+                select(BotUser.telegram_user_id).where(BotUser.is_admin.is_(True))
+            ).scalars()
+        }),
+        "subscriptions_enabled": settings.subscriptions_enabled,
     }
 
 
@@ -131,7 +132,7 @@ def list_users(
     db: Session = Depends(get_db),
     _: TelegramUser = Depends(require_admin),
     search: str = "",
-    filter: str = Query("all", pattern="^(all|subscribed|exhausted|active)$"),
+    filter: str = Query("all", pattern="^(all|subscribed|exhausted|active|admins)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
@@ -164,6 +165,15 @@ def list_users(
         )
     elif filter == "active":
         stmt = stmt.where(BotUser.last_seen_at >= _day_start_utc(6))
+    elif filter == "admins":
+        # Root admins are admins by id alone, so they belong here even with the
+        # column still false (e.g. promoted via env after the row was created).
+        stmt = stmt.where(
+            or_(
+                BotUser.is_admin.is_(True),
+                BotUser.telegram_user_id.in_(settings.admin_ids or {0}),
+            )
+        )
 
     total = db.execute(
         select(func.count()).select_from(stmt.subquery())
@@ -197,6 +207,9 @@ def list_users(
                 ),
                 "last_seen_at": u.last_seen_at.isoformat() if u.last_seen_at else None,
                 "created_at": u.created_at.isoformat() if u.created_at else None,
+                "is_admin": bool(u.is_admin) or is_root_admin(u.telegram_user_id),
+                # Root admins come from the env and have no in-app toggle.
+                "is_root_admin": is_root_admin(u.telegram_user_id),
             }
             for u in users
         ],
@@ -297,3 +310,57 @@ def user_payments(
         }
         for p in rows
     ]
+
+
+class AdminFlagIn(BaseModel):
+    is_admin: bool
+
+
+@router.post("/users/{telegram_user_id}/admin")
+def set_admin(
+    telegram_user_id: int,
+    body: AdminFlagIn,
+    db: Session = Depends(get_db),
+    admin: TelegramUser = Depends(require_admin),
+):
+    """Promote someone to admin, or take it away — the whole point being that
+    this no longer needs an .env edit and a redeploy.
+
+    Two things are refused outright, both to keep the panel reachable:
+    a root admin (an id in ADMIN_TELEGRAM_IDS) can't be demoted, since the env
+    would keep letting them back in anyway and the button would be a lie; and
+    nobody can demote themselves, which is the one mistake that locks the
+    current session out of the screen it was clicking on.
+    """
+    if is_root_admin(telegram_user_id) and not body.is_admin:
+        raise HTTPException(
+            400,
+            "Bu foydalanuvchi asosiy admin (server sozlamasida) — "
+            "panel orqali olib tashlab bo'lmaydi.",
+        )
+    if telegram_user_id == admin.id and not body.is_admin:
+        raise HTTPException(
+            400, "O'zingizni adminlikdan olib tashlay olmaysiz."
+        )
+
+    user = db.get(BotUser, telegram_user_id)
+    if user is None:
+        if not body.is_admin:
+            raise HTTPException(404, "Foydalanuvchi topilmadi")
+        # Promoting someone who has never opened the Mini App: create the row
+        # now rather than making them log in first and be searched for
+        # afterwards. Their name fills itself in the moment they do open it,
+        # and this is what lets an admin be added from a bare Telegram id.
+        user = BotUser(telegram_user_id=telegram_user_id)
+        db.add(user)
+
+    user.is_admin = body.is_admin
+    db.commit()
+    logger.info(
+        "admin %s set is_admin=%s for %s", admin.id, body.is_admin, telegram_user_id
+    )
+    return {
+        "telegram_user_id": telegram_user_id,
+        "is_admin": bool(user.is_admin) or is_root_admin(telegram_user_id),
+        "is_root_admin": is_root_admin(telegram_user_id),
+    }

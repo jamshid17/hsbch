@@ -13,6 +13,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.sql import false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -137,6 +138,12 @@ class BotUser(Base):
     # UTC instant the subscription lapses; NULL or past = free tier.
     subscription_until: Mapped[datetime | None] = mapped_column(
         DateTime, nullable=True
+    )
+    # Admin panel access, granted/revoked from the panel itself. The ids in
+    # ADMIN_TELEGRAM_IDS are admins regardless of this column and can't be
+    # demoted — they're the bootstrap that makes the panel reachable at all.
+    is_admin: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
     )
 
 

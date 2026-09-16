@@ -18,7 +18,10 @@ export default function EntryPage() {
 
   const [showPaywall, setShowPaywall] = useState(false);
   // Scanning is the only gated action — joining someone else's bill stays free.
-  const locked = !!me && !me.is_subscribed && me.scans_left === 0;
+  // With the paid tier switched off nothing is gated at all, so the lock, the
+  // remaining-scans line and the card block all disappear together.
+  const paid = !!me?.subscriptions_enabled;
+  const locked = paid && !!me && !me.is_subscribed && me.scans_left === 0;
 
   // Deep link (?join=CODE or Telegram startapp) → jump straight to join.
   useEffect(() => {
@@ -52,14 +55,14 @@ export default function EntryPage() {
         </button>
       )}
 
-      {me?.is_subscribed && (
+      {paid && me?.is_subscribed && (
         <p style={{ color: "var(--hint)", fontSize: 14, textAlign: "center" }}>
           {t("entry.subActive", { date: subUntil })}
         </p>
       )}
 
       {/* Free scans left — no upsell while the user still has some. */}
-      {me && !me.is_subscribed && me.scans_left > 0 && (
+      {paid && me && !me.is_subscribed && me.scans_left > 0 && (
         <p style={{ color: "var(--hint)", fontSize: 13, textAlign: "center" }}>
           {t("entry.scansLeft", {
             left: me.scans_left,

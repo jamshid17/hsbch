@@ -4,6 +4,7 @@ from datetime import datetime
 from app.config import settings
 from app.db import get_db
 from app.models import BotUser
+from app.services.admin_auth import is_admin as user_is_admin
 from app.services.telegram_auth import TelegramUser, get_tg_user
 from fastapi import APIRouter, Depends
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -54,8 +55,9 @@ def get_me(
     subscribed = bool(user.subscription_until and user.subscription_until > now)
     scans_left = max(settings.free_total_scans - user.free_scans_used, 0)
 
-    # None (not an empty object) when card payments aren't configured, so the
-    # client has a single flag to branch on.
+    # Paid tier switched off: nothing is gated, so there's no card block to
+    # show and no quota worth reporting. The client keys every paywall
+    # affordance off subscriptions_enabled rather than inferring it.
     card = (
         {
             "number": settings.card_number,
@@ -63,11 +65,13 @@ def get_me(
             "price_uzs": settings.subscription_price_uzs,
             "admin_contact": settings.admin_contact,
         }
-        if settings.card_number
+        if settings.subscriptions_enabled and settings.card_number
         else None
     )
 
     return {
+        "telegram_user_id": tg_user.id,
+        "subscriptions_enabled": settings.subscriptions_enabled,
         "is_subscribed": subscribed,
         "subscription_until": (
             user.subscription_until.isoformat() if subscribed else None
@@ -75,6 +79,6 @@ def get_me(
         "scans_left": settings.free_total_scans if subscribed else scans_left,
         "free_total_scans": settings.free_total_scans,
         "subscription_days": settings.subscription_days,
-        "is_admin": tg_user.id in settings.admin_ids,
+        "is_admin": user_is_admin(db, tg_user.id),
         "card": card,
     }

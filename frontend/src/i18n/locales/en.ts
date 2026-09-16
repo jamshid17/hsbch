@@ -32,6 +32,8 @@ export default {
     scanning: "Scanning…",
     scannedAs: "Scanned as",
     continueBtn: "Continue →",
+    notAnImage: "Please upload a receipt photo only (JPG, PNG). PDFs and other files aren't accepted.",
+    tooLarge: "Couldn't compress the image. Pick another photo or retake the receipt.",
   },
   edit: {
     title: "Review Items",

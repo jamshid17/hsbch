@@ -102,6 +102,10 @@ export interface ScanResult {
 }
 
 export interface MeOut {
+  telegram_user_id: number;
+  /** False = the paid tier is off and the app is fully free. Every paywall,
+   * quota line and card block is keyed off this. */
+  subscriptions_enabled: boolean;
   is_subscribed: boolean;
   subscription_until: string | null;
   scans_left: number;
@@ -130,6 +134,8 @@ export interface AdminStats {
   payments_month: number;
   price_uzs: number;
   daily_scans: { date: string; scans: number }[];
+  admins_total: number;
+  subscriptions_enabled: boolean;
 }
 
 export interface AdminUser {
@@ -143,6 +149,9 @@ export interface AdminUser {
   subscription_until: string | null;
   last_seen_at: string | null;
   created_at: string | null;
+  is_admin: boolean;
+  /** Admin via ADMIN_TELEGRAM_IDS — can't be demoted from the panel. */
+  is_root_admin: boolean;
 }
 
 export const api = {
@@ -177,6 +186,12 @@ export const api = {
     request<{ is_subscribed: boolean }>(`/admin/users/${userId}/revoke`, {
       method: "POST",
     }),
+
+  adminSetAdmin: (userId: number, isAdmin: boolean) =>
+    request<{ is_admin: boolean; is_root_admin: boolean }>(
+      `/admin/users/${userId}/admin`,
+      { method: "POST", body: JSON.stringify({ is_admin: isAdmin }) },
+    ),
 
   createSession: () =>
     request<SessionOut>("/sessions", { method: "POST" }),

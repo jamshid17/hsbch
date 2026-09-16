@@ -15,12 +15,27 @@ class Settings(BaseSettings):
     # For local development / browser testing only. Never enable in production.
     dev_allow_unsafe: bool = False
 
+    # Master switch for the whole paid tier. While false the app is fully
+    # free: the scan quota is never spent, the paywall and card block never
+    # render, and the admin panel hides its subscription controls. Flipping it
+    # back to true restores the existing behaviour untouched — nothing about
+    # quotas or payments was deleted, only bypassed.
+    subscriptions_enabled: bool = False
+
     subscription_days: int = 30
     # Lifetime free receipt scans per user (not per day) before a subscription
-    # is required.
+    # is required. Only enforced while subscriptions_enabled is true.
     free_total_scans: int = 5
-    # Comma-separated Telegram user ids that get the in-app admin panel.
+    # Comma-separated Telegram user ids that are always admins and can never be
+    # demoted from the panel — the bootstrap that keeps the panel reachable.
+    # Everyone else is promoted/demoted in-app via bot_users.is_admin.
     admin_telegram_ids: str = ""
+
+    # Receipt upload cap. The Mini App compresses to under 2 MB before
+    # uploading, so this is headroom rather than the real limit. Kept in step
+    # with `client_max_body_size` on nginx's /api/ location — set higher and
+    # nginx rejects the request first, with an HTML 413 the client can't read.
+    max_upload_mb: int = 5
 
     # Manual card payments: the user transfers to this card and sends the
     # receipt to @<admin_contact>, who then enables the subscription by hand.
@@ -34,6 +49,10 @@ class Settings(BaseSettings):
     # /webhook request — without it, anyone could POST a forged
     # successful_payment update and grant themselves a free subscription.
     telegram_webhook_secret: str
+
+    @property
+    def max_upload_bytes(self) -> int:
+        return self.max_upload_mb * 1024 * 1024
 
     @property
     def admin_ids(self) -> set[int]:

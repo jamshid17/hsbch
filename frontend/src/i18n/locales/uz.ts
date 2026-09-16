@@ -32,6 +32,8 @@ export default {
     scanning: "Skanerlanmoqda…",
     scannedAs: "Chek nomi",
     continueBtn: "Davom etish →",
+    notAnImage: "Faqat chek rasmini yuklang (JPG, PNG). PDF va boshqa fayllar qabul qilinmaydi.",
+    tooLarge: "Rasmni siqib bo'lmadi. Boshqa rasm tanlang yoki chekni qaytadan suratga oling.",
   },
   edit: {
     title: "Mahsulotlarni tekshiring",

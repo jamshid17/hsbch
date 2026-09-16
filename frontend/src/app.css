@@ -966,8 +966,13 @@ input:focus {
   color: #f08c00;
 }
 
+.badge-admin {
+  background: color-mix(in srgb, #5b6ee1 22%, transparent);
+}
+
 .badge-ok,
-.badge-warn {
+.badge-warn,
+.badge-admin {
   color: var(--text);
 }
 
@@ -977,6 +982,23 @@ input:focus {
 
 .badge-warn::before {
   background: #f08c00;
+}
+
+.badge-admin::before {
+  background: #5b6ee1;
+}
+
+/* Standing state the admin should read once and stop noticing — e.g. "the
+   paid tier is off". Quieter than .error, which reports a failed action. */
+.notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border-left: 3px solid #5b6ee1;
+  background: color-mix(in srgb, #5b6ee1 10%, transparent);
+  color: var(--hint);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .btn-mini {
@@ -1082,4 +1104,29 @@ input:focus {
   gap: 6px;
   font-size: 14px;
   line-height: 1.4;
+}
+
+.add-admin {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.add-admin-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.add-admin-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.add-admin-row .btn-mini {
+  flex-shrink: 0;
+  padding-inline: 14px;
 }

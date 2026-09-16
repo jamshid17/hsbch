@@ -3,7 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "../api";
-import { downscaleImage } from "../lib/image";
+import {
+  ACCEPT_ATTR,
+  ImageTooLargeError,
+  compressImage,
+  isAcceptedImage,
+} from "../lib/image";
 import Paywall from "../components/Paywall";
 
 export default function ScanPage() {
@@ -24,7 +29,21 @@ export default function ScanPage() {
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
+    // Reset the input either way, so picking the same file again after an
+    // error still fires a change event.
+    e.target.value = "";
     if (!f) return;
+
+    // The accept attribute is a hint, not a rule — desktop pickers and some
+    // Android file managers hand over PDFs regardless. Refuse here so nothing
+    // is uploaded and no session is created for a file that can never scan.
+    if (!isAcceptedImage(f)) {
+      setFile(null);
+      setPreview(null);
+      setError(t("scan.notAnImage"));
+      return;
+    }
+
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setError("");
@@ -38,13 +57,19 @@ export default function ScanPage() {
     setError("");
     setQuotaExceeded(false);
     try {
-      const image = await downscaleImage(file);
+      // Compress before the session exists: a photo that can't be shrunk under
+      // the limit shouldn't leave an empty session behind.
+      const image = await compressImage(file);
       const session = await api.createSession();
       await api.uploadReceipt(session.id, image);
       navigate(`/edit/${session.id}`);
     } catch (e: unknown) {
-      if (e instanceof ApiError && e.status === 402) {
+      if (e instanceof ImageTooLargeError) {
+        setError(t("scan.tooLarge"));
+      } else if (e instanceof ApiError && e.status === 402) {
         setQuotaExceeded(true);
+        setError(e.message);
+      } else if (e instanceof ApiError && (e.status === 413 || e.status === 415)) {
         setError(e.message);
       } else {
         setError(e instanceof Error ? e.message : t("scan.scanning"));
@@ -61,8 +86,10 @@ export default function ScanPage() {
   }
 
   // Out of free scans: the picker never appears, so nobody burns a photo on a
-  // request the server would reject with 402 anyway.
-  const locked = !!me && !me.is_subscribed && me.scans_left === 0;
+  // request the server would reject with 402 anyway. Nothing is locked while
+  // the paid tier is switched off.
+  const locked =
+    !!me && me.subscriptions_enabled && !me.is_subscribed && me.scans_left === 0;
 
   if (locked && me) {
     return (
@@ -101,7 +128,7 @@ export default function ScanPage() {
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept={ACCEPT_ATTR}
           onChange={onFileChange}
           style={{ display: "none" }}
         />
@@ -120,7 +147,9 @@ export default function ScanPage() {
       )}
 
       {error && <p className="error">{error}</p>}
-      {quotaExceeded && me && !me.is_subscribed && <Paywall me={me} />}
+      {quotaExceeded && me && me.subscriptions_enabled && !me.is_subscribed && (
+        <Paywall me={me} />
+      )}
 
       {scanned ? (
         <button className="btn" onClick={handleContinue}>
