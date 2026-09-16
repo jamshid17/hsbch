@@ -242,6 +242,11 @@ h2 {
   opacity: 0.85;
 }
 
+.btn-danger {
+  background: #e53935;
+  color: #ffffff;
+}
+
 .btn-ghost {
   background: transparent;
   color: var(--link);

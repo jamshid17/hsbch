@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
 import type { AdminUser } from "../api";
 import DailyScansChart from "../components/DailyScansChart";
+import ConfirmSheet from "../components/ConfirmSheet";
 
 const FILTERS = [
   { key: "all", label: "Hammasi" },
@@ -44,9 +45,13 @@ function StatTile({ label, value, hint }: { label: string; value: string; hint?:
   );
 }
 
+type PendingAction = "grant" | "extend" | "revoke";
+
 function UserRow({ user }: { user: AdminUser }) {
   const queryClient = useQueryClient();
-  const [confirming, setConfirming] = useState(false);
+  // Every write goes through a confirmation sheet — these rows sit close
+  // together on a phone and all three actions change what someone paid for.
+  const [pending, setPending] = useState<PendingAction | null>(null);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
@@ -55,12 +60,15 @@ function UserRow({ user }: { user: AdminUser }) {
 
   const grant = useMutation({
     mutationFn: () => api.adminGrant(user.telegram_user_id, 30),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      setPending(null);
+      invalidate();
+    },
   });
   const revoke = useMutation({
     mutationFn: () => api.adminRevoke(user.telegram_user_id),
     onSuccess: () => {
-      setConfirming(false);
+      setPending(null);
       invalidate();
     },
   });
@@ -91,43 +99,56 @@ function UserRow({ user }: { user: AdminUser }) {
 
       <div className="user-actions">
         {user.is_subscribed ? (
-          confirming ? (
-            <>
-              <button
-                className="btn-mini btn-mini-danger"
-                disabled={revoke.isPending}
-                onClick={() => revoke.mutate()}
-              >
-                {revoke.isPending ? "…" : "Aniqmi?"}
-              </button>
-              <button className="btn-mini" onClick={() => setConfirming(false)}>
-                Yo'q
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                className="btn-mini"
-                disabled={grant.isPending}
-                onClick={() => grant.mutate()}
-              >
-                {grant.isPending ? "…" : "+30 kun"}
-              </button>
-              <button className="btn-mini" onClick={() => setConfirming(true)}>
-                Bekor
-              </button>
-            </>
-          )
+          <>
+            <button className="btn-mini" onClick={() => setPending("extend")}>
+              +30 kun
+            </button>
+            <button className="btn-mini btn-mini-danger" onClick={() => setPending("revoke")}>
+              To'xtatish
+            </button>
+          </>
         ) : (
-          <button
-            className="btn-mini btn-mini-primary"
-            disabled={grant.isPending}
-            onClick={() => grant.mutate()}
-          >
-            {grant.isPending ? "…" : "✅ Obunani yoqish"}
+          <button className="btn-mini btn-mini-primary" onClick={() => setPending("grant")}>
+            ✅ Obunani yoqish
           </button>
         )}
       </div>
+
+      {pending === "grant" && (
+        <ConfirmSheet
+          title="Obunani yoqish"
+          body={`${name} (${user.telegram_user_id}) uchun 30 kunlik obuna yoqiladi va to'lov yozib qo'yiladi. To'lov haqiqatan kelganini tekshirdingizmi?`}
+          confirmLabel="Ha, yoqish"
+          busy={grant.isPending}
+          onConfirm={() => grant.mutate()}
+          onCancel={() => setPending(null)}
+        />
+      )}
+
+      {pending === "extend" && (
+        <ConfirmSheet
+          title="Obunani uzaytirish"
+          body={`${name} uchun yana 30 kun qo'shiladi${
+            until ? ` — ${until} dan keyin davom etadi` : ""
+          }. Yangi to'lov yozib qo'yiladi.`}
+          confirmLabel="Ha, +30 kun"
+          busy={grant.isPending}
+          onConfirm={() => grant.mutate()}
+          onCancel={() => setPending(null)}
+        />
+      )}
+
+      {pending === "revoke" && (
+        <ConfirmSheet
+          title="Obunani to'xtatish"
+          body={`${name} ning obunasi darhol to'xtatiladi va u yana bepul limitga qaytadi. Keyin faqat qayta yoqish orqali tiklanadi.`}
+          confirmLabel="Ha, to'xtatish"
+          danger
+          busy={revoke.isPending}
+          onConfirm={() => revoke.mutate()}
+          onCancel={() => setPending(null)}
+        />
+      )}
     </div>
   );
 }
