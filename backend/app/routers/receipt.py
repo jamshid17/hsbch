@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from app.config import settings
 from app.db import get_db
 from app.models import BotUser, Item
 from app.models import Session as SessionModel
@@ -18,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/sessions", tags=["receipt"])
 
-FREE_DAILY_SCANS = 2
 TASHKENT = ZoneInfo("Asia/Tashkent")
 
 
@@ -49,7 +49,7 @@ def _claim_scan_slot(db: Session, telegram_user_id: int) -> bool:
             BotUser.telegram_user_id == telegram_user_id,
             or_(
                 BotUser.quota_date.is_distinct_from(today),
-                BotUser.scan_count < FREE_DAILY_SCANS,
+                BotUser.scan_count < settings.free_daily_scans,
             ),
         )
         .values(
@@ -95,8 +95,9 @@ async def upload_receipt(
     if not _claim_scan_slot(db, tg_user.id):
         raise HTTPException(
             402,
-            f"Kunlik bepul limitga yetdingiz ({FREE_DAILY_SCANS}/{FREE_DAILY_SCANS}). "
-            "Obuna bo'lib, cheklovsiz skanerlang.",
+            f"Kunlik bepul limit tugadi ({settings.free_daily_scans}/"
+            f"{settings.free_daily_scans}). {settings.subscription_days} kunlik "
+            f"cheksiz obuna — {settings.subscription_stars} ⭐.",
         )
 
     try:

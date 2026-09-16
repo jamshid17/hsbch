@@ -20,6 +20,9 @@ export default {
     scanBtn: "📷 Сканировать чек",
     joinBtn: "🔑 Присоединиться по коду",
     subscribeBtn: "⭐ Оформить подписку",
+    subscribeStars: "⭐ Подписка на {{days}} дней за {{stars}} звёзд",
+    subActive: "Подписка активна — до {{date}}",
+    scansLeft: "Бесплатных сканов сегодня: {{left}}/{{total}}",
   },
   scan: {
     title: "Делим счёт",
@@ -30,6 +33,7 @@ export default {
     scannedAs: "Название чека",
     continueBtn: "Продолжить →",
     subscribeBtn: "Оформить подписку",
+    subscribeStars: "⭐ Подписка за {{stars}} звёзд ({{days}} дней)",
   },
   edit: {
     title: "Проверьте позиции",
@@ -130,5 +134,11 @@ export default {
     copied: "✓ Скопировано",
     grandTotal: "Итого",
     failedLoad: "Ошибка загрузки",
+  },
+  pay: {
+    cancelled: "Платёж отменён.",
+    failed: "Платёж не прошёл. Попробуйте ещё раз.",
+    activated: "✅ Подписка активирована!",
+    retryHint: "Теперь можно отсканировать чек ещё раз.",
   },
 } as const;

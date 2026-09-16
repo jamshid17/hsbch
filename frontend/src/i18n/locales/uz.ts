@@ -20,6 +20,9 @@ export default {
     scanBtn: "📷 Chekni skanerlash",
     joinBtn: "🔑 Code bilan qo'shilish",
     subscribeBtn: "⭐ Obuna bo'lish",
+    subscribeStars: "⭐ {{stars}} yulduzga {{days}} kunlik obuna",
+    subActive: "Obuna faol — {{date}} gacha",
+    scansLeft: "Bugun bepul skan: {{left}}/{{total}}",
   },
   scan: {
     title: "Hisob bo'luvchi",
@@ -30,6 +33,7 @@ export default {
     scannedAs: "Chek nomi",
     continueBtn: "Davom etish →",
     subscribeBtn: "Obuna bo'lish",
+    subscribeStars: "⭐ {{stars}} yulduzga obuna ({{days}} kun)",
   },
   edit: {
     title: "Mahsulotlarni tekshiring",
@@ -130,5 +134,11 @@ export default {
     copied: "✓ Buferga nusxalandi",
     grandTotal: "Jami",
     failedLoad: "Yuklab bo'lmadi",
+  },
+  pay: {
+    cancelled: "To'lov bekor qilindi.",
+    failed: "To'lov amalga oshmadi. Qaytadan urinib ko'ring.",
+    activated: "✅ Obuna faollashtirildi!",
+    retryHint: "Endi chekni qayta skanerlashingiz mumkin.",
   },
 } as const;

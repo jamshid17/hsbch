@@ -20,6 +20,9 @@ export default {
     scanBtn: "📷 Scan a receipt",
     joinBtn: "🔑 Join with a code",
     subscribeBtn: "⭐ Subscribe",
+    subscribeStars: "⭐ Subscribe for {{stars}} stars / {{days}} days",
+    subActive: "Subscription active — until {{date}}",
+    scansLeft: "Free scans today: {{left}}/{{total}}",
   },
   scan: {
     title: "Bill Splitter",
@@ -30,6 +33,7 @@ export default {
     scannedAs: "Scanned as",
     continueBtn: "Continue →",
     subscribeBtn: "Subscribe",
+    subscribeStars: "⭐ Subscribe for {{stars}} stars ({{days}} days)",
   },
   edit: {
     title: "Review Items",
@@ -130,5 +134,11 @@ export default {
     copied: "✓ Copied to clipboard",
     grandTotal: "Grand total",
     failedLoad: "Failed to load",
+  },
+  pay: {
+    cancelled: "Payment cancelled.",
+    failed: "Payment failed. Please try again.",
+    activated: "✅ Subscription activated!",
+    retryHint: "You can scan the receipt again now.",
   },
 } as const;

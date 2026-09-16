@@ -146,6 +146,14 @@ class Payment(Base):
     telegram_payment_charge_id: Mapped[str] = mapped_column(
         String(128), nullable=False, unique=True
     )
-    provider_payment_charge_id: Mapped[str] = mapped_column(String(128), nullable=False)
-    amount_tiyin: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    # Empty/absent for Telegram Stars (there is no external provider), so this
+    # can't stay NOT NULL the way it could for Paycom.
+    provider_payment_charge_id: Mapped[str | None] = mapped_column(
+        String(128), nullable=True
+    )
+    # Interpreted through `currency`: star count for XTR, tiyin for UZS.
+    amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
     currency: Mapped[str] = mapped_column(String(10), nullable=False)
+    # Set when the charge is refunded via refundStarPayment; the subscription
+    # is revoked at the same time.
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

@@ -101,6 +101,15 @@ export interface ScanResult {
   items: { name: string; price: string; quantity: string; unit: string }[];
 }
 
+export interface MeOut {
+  is_subscribed: boolean;
+  subscription_until: string | null;
+  scans_left: number;
+  free_daily_scans: number;
+  price_stars: number;
+  subscription_days: number;
+}
+
 export const api = {
   // Validates the Telegram initData (sent via the X-Telegram-Init-Data header
   // by authHeaders()) and returns the authenticated user.
@@ -109,6 +118,13 @@ export const api = {
 
   getConfig: () =>
     request<{ bot_username: string | null }>("/config"),
+
+  getMe: () => request<MeOut>("/me"),
+
+  createInvoiceLink: () =>
+    request<{ link: string; price_stars: number }>("/payments/invoice-link", {
+      method: "POST",
+    }),
 
   createSession: () =>
     request<SessionOut>("/sessions", { method: "POST" }),

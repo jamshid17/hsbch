@@ -5,7 +5,16 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, config, items, people, receipt, sessions, summary
+from app.routers import (
+    auth,
+    config,
+    items,
+    payments,
+    people,
+    receipt,
+    sessions,
+    summary,
+)
 from app.ws import manager
 
 
@@ -32,6 +41,7 @@ app.include_router(people.router)
 app.include_router(receipt.router)
 app.include_router(items.router)
 app.include_router(summary.router)
+app.include_router(payments.router)
 
 
 @app.post("/webhook")

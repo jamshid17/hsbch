@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api";
-import { getJoinCode, tg } from "../telegram";
+import { getJoinCode } from "../telegram";
+import { useSubscribe } from "../lib/useSubscribe";
 
 export default function EntryPage() {
   const { t } = useTranslation();
@@ -14,15 +15,22 @@ export default function EntryPage() {
     queryFn: () => api.getConfig(),
   });
 
+  const { data: me } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => api.getMe(),
+  });
+
+  const { subscribe, state: subState } = useSubscribe(config?.bot_username);
+
   // Deep link (?join=CODE or Telegram startapp) → jump straight to join.
   useEffect(() => {
     const code = getJoinCode();
     if (code) navigate(`/join?code=${code}`, { replace: true });
   }, [navigate]);
 
-  function handleSubscribe() {
-    tg.openTelegramLink(`https://t.me/${config?.bot_username ?? "hsbchbot"}?start=subscribe`);
-  }
+  const subUntil = me?.subscription_until
+    ? new Date(me.subscription_until).toLocaleDateString()
+    : null;
 
   return (
     <div className="page">
@@ -35,9 +43,37 @@ export default function EntryPage() {
       <button className="btn btn-ghost" onClick={() => navigate("/join")}>
         {t("entry.joinBtn")}
       </button>
-      <button className="btn btn-ghost" onClick={handleSubscribe}>
-        {t("entry.subscribeBtn")}
-      </button>
+
+      {me?.is_subscribed ? (
+        <p style={{ color: "var(--hint)", fontSize: 14, textAlign: "center" }}>
+          {t("entry.subActive", { date: subUntil })}
+        </p>
+      ) : (
+        <>
+          <button
+            className="btn btn-ghost"
+            disabled={subState === "opening"}
+            onClick={subscribe}
+          >
+            {t("entry.subscribeStars", {
+              stars: me?.price_stars ?? 50,
+              days: me?.subscription_days ?? 30,
+            })}
+          </button>
+          {me && (
+            <p style={{ color: "var(--hint)", fontSize: 13, textAlign: "center" }}>
+              {t("entry.scansLeft", {
+                left: me.scans_left,
+                total: me.free_daily_scans,
+              })}
+            </p>
+          )}
+        </>
+      )}
+
+      {subState === "cancelled" && <p className="error">{t("pay.cancelled")}</p>}
+      {subState === "failed" && <p className="error">{t("pay.failed")}</p>}
+      {subState === "paid" && <p className="success">{t("pay.activated")}</p>}
     </div>
   );
 }

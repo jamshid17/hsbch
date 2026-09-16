@@ -249,6 +249,12 @@ input:focus {
   margin: 0;
 }
 
+.success {
+  color: #2e7d32;
+  font-size: 14px;
+  margin: 0;
+}
+
 /* ── Loading ── */
 .spinner {
   text-align: center;

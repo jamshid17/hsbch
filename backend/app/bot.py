@@ -78,20 +78,46 @@ async def cmd_subscribe(message: Message):
     await send_subscription_invoice(message)
 
 
+SUBSCRIPTION_TITLE = "30 kunlik cheksiz skanerlash"
+
+
+def _subscription_description() -> str:
+    return (
+        f"{settings.subscription_days} kun davomida kunlik limitsiz "
+        "chek skanerlash imkoniyati."
+    )
+
+
+def _subscription_prices() -> list[LabeledPrice]:
+    # Stars amounts are the star count itself — unlike fiat currencies there is
+    # no minor unit, so nothing is multiplied by 100 here.
+    return [LabeledPrice(label="Obuna", amount=settings.subscription_stars)]
+
+
 async def send_subscription_invoice(message: Message):
     await bot.send_invoice(
         chat_id=message.chat.id,
-        title="30 kunlik cheksiz skanerlash",
-        description=(
-            f"{settings.subscription_days} kun davomida kunlik limitsiz "
-            "chek skanerlash imkoniyati."
-        ),
+        title=SUBSCRIPTION_TITLE,
+        description=_subscription_description(),
         payload=f"subscription:{message.from_user.id}",
-        provider_token=settings.payment_provider_token,
-        currency="UZS",
-        prices=[
-            LabeledPrice(label="Obuna", amount=settings.subscription_price_uzs * 100)
-        ],
+        # Stars (XTR) are settled by Telegram itself: no provider token, no
+        # merchant account, no local payment-provider integration.
+        provider_token="",
+        currency="XTR",
+        prices=_subscription_prices(),
+    )
+
+
+async def create_subscription_invoice_link(telegram_user_id: int) -> str:
+    """Invoice link for paying inside the Mini App via WebApp.openInvoice(),
+    so the user never has to leave the app for the bot chat."""
+    return await bot.create_invoice_link(
+        title=SUBSCRIPTION_TITLE,
+        description=_subscription_description(),
+        payload=f"subscription:{telegram_user_id}",
+        provider_token="",
+        currency="XTR",
+        prices=_subscription_prices(),
     )
 
 
@@ -123,8 +149,10 @@ async def handle_successful_payment(message: Message):
             Payment(
                 telegram_user_id=user_id,
                 telegram_payment_charge_id=sp.telegram_payment_charge_id,
-                provider_payment_charge_id=sp.provider_payment_charge_id,
-                amount_tiyin=sp.total_amount,
+                # Stars payments have no external provider, so this arrives
+                # empty or missing.
+                provider_payment_charge_id=sp.provider_payment_charge_id or None,
+                amount=sp.total_amount,
                 currency=sp.currency,
             )
         )
@@ -145,6 +173,65 @@ async def handle_successful_payment(message: Message):
     await message.answer(
         "✅ Obuna faollashtirildi! Endi kunlik limitsiz chek skanerlashingiz mumkin."
     )
+
+
+@router.message(Command("refund"))
+async def cmd_refund(message: Message, command: CommandObject):
+    """Admin-only: /refund <telegram_payment_charge_id>.
+
+    Refunding returns the stars to the buyer, so the subscription it paid for
+    is revoked in the same transaction — otherwise a user could refund and keep
+    scanning for free.
+    """
+    if message.from_user.id not in settings.admin_ids:
+        return
+
+    charge_id = (command.args or "").strip()
+    if not charge_id:
+        await message.answer("Foydalanish: /refund <telegram_payment_charge_id>")
+        return
+
+    async with AsyncSessionLocal() as db:
+        payment = (
+            await db.execute(
+                select(Payment).where(
+                    Payment.telegram_payment_charge_id == charge_id
+                )
+            )
+        ).scalar_one_or_none()
+        if payment is None:
+            await message.answer("Bunday to'lov topilmadi.")
+            return
+        if payment.refunded_at is not None:
+            await message.answer("Bu to'lov allaqachon qaytarilgan.")
+            return
+
+        await bot.refund_star_payment(
+            user_id=payment.telegram_user_id,
+            telegram_payment_charge_id=charge_id,
+        )
+
+        payment.refunded_at = datetime.utcnow()
+        user = await db.get(BotUser, payment.telegram_user_id)
+        if user is not None:
+            # Revoke immediately rather than rewinding by subscription_days:
+            # the paid period is gone regardless of how much of it was used.
+            user.subscription_until = datetime.utcnow()
+        # Read before the commit expires the instance — the session is closed
+        # by the time the replies below are sent.
+        amount, buyer_id = payment.amount, payment.telegram_user_id
+        await db.commit()
+
+    await message.answer(f"↩️ {amount} ⭐ qaytarildi, obuna bekor qilindi.")
+    try:
+        await bot.send_message(
+            buyer_id,
+            "↩️ Obuna to'lovingiz qaytarildi. Yulduzlar hisobingizga qaytdi.",
+        )
+    except Exception:
+        # The user may have blocked the bot — the refund itself already went
+        # through, so this notification is best-effort.
+        pass
 
 
 @router.inline_query()

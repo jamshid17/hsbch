@@ -1,10 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "../api";
 import { downscaleImage } from "../lib/image";
-import { tg } from "../telegram";
+import { useSubscribe } from "../lib/useSubscribe";
 
 export default function ScanPage() {
   const { t } = useTranslation();
@@ -22,6 +22,13 @@ export default function ScanPage() {
     queryFn: () => api.getConfig(),
   });
 
+  const { data: me } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => api.getMe(),
+  });
+
+  const { subscribe, state: subState } = useSubscribe(config?.bot_username);
+
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -31,6 +38,15 @@ export default function ScanPage() {
     setQuotaExceeded(false);
     setScanned(null);
   }
+
+  // Once the payment lands, drop the quota error so the user can scan again
+  // without re-picking the same photo.
+  useEffect(() => {
+    if (subState === "paid") {
+      setQuotaExceeded(false);
+      setError("");
+    }
+  }, [subState]);
 
   async function handleScan() {
     if (!file) return;
@@ -52,10 +68,6 @@ export default function ScanPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleSubscribe() {
-    tg.openTelegramLink(`https://t.me/${config?.bot_username ?? "hsbchbot"}?start=subscribe`);
   }
 
   async function handleContinue() {
@@ -108,10 +120,22 @@ export default function ScanPage() {
       )}
 
       {error && <p className="error">{error}</p>}
-      {quotaExceeded && (
-        <button className="btn" onClick={handleSubscribe}>
-          {t("scan.subscribeBtn")}
-        </button>
+      {quotaExceeded && !me?.is_subscribed && (
+        <>
+          <button className="btn" disabled={subState === "opening"} onClick={subscribe}>
+            {t("scan.subscribeStars", {
+              stars: me?.price_stars ?? 50,
+              days: me?.subscription_days ?? 30,
+            })}
+          </button>
+          {subState === "cancelled" && <p className="error">{t("pay.cancelled")}</p>}
+          {subState === "failed" && <p className="error">{t("pay.failed")}</p>}
+          {subState === "paid" && <p className="success">{t("pay.activated")}</p>}
+        </>
+      )}
+
+      {subState === "paid" && !scanned && (
+        <p style={{ color: "var(--hint)", fontSize: 14 }}>{t("pay.retryHint")}</p>
       )}
 
       {scanned ? (
