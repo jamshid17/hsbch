@@ -5,6 +5,7 @@ from app.config import settings
 from app.db import get_db
 from app.models import BotUser
 from app.services.admin_auth import is_admin as user_is_admin
+from app.services.admin_auth import is_super_admin
 from app.services.telegram_auth import TelegramUser, get_tg_user
 from fastapi import APIRouter, Depends
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -80,5 +81,8 @@ def get_me(
         "free_total_scans": settings.free_total_scans,
         "subscription_days": settings.subscription_days,
         "is_admin": user_is_admin(db, tg_user.id),
+        # The owner account. Ordinary admins only get the overview tab,
+        # so the panel keys every other tab off this flag.
+        "is_super_admin": is_super_admin(tg_user.id),
         "card": card,
     }

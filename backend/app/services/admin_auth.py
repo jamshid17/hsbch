@@ -52,3 +52,15 @@ def require_admin(
     if not is_admin(db, tg_user.id):
         raise HTTPException(404, "Not found")
     return tg_user
+
+
+def require_super_admin(
+    tg_user: TelegramUser = Depends(get_tg_user),
+) -> TelegramUser:
+    """For the parts of the panel only the owner account may see: payments,
+    sessions, the raw tables, and handing out admin rights. Ordinary admins
+    get the overview tab and nothing else, so these answer 404 to them too —
+    same reasoning as require_admin."""
+    if not is_super_admin(tg_user.id):
+        raise HTTPException(404, "Not found")
+    return tg_user

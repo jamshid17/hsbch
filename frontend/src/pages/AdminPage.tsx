@@ -20,11 +20,14 @@ const FILTERS = [
   { key: "exhausted", label: "Limiti tugagan", paidOnly: true },
 ] as const;
 
+// Everything past the overview is the owner account's alone — the backend
+// answers 404 to an ordinary admin on those endpoints, so hiding the tabs is
+// the honest thing to show rather than the lock itself.
 const TABS = [
   { key: "overview", label: "📊 Umumiy" },
-  { key: "payments", label: "💳 To'lovlar" },
-  { key: "sessions", label: "🧾 Sessiyalar" },
-  { key: "tables", label: "🗄 Baza" },
+  { key: "payments", label: "💳 To'lovlar", superOnly: true },
+  { key: "sessions", label: "🧾 Sessiyalar", superOnly: true },
+  { key: "tables", label: "🗄 Baza", superOnly: true },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -53,10 +56,12 @@ function UserRow({
   user,
   paid,
   meId,
+  canManageAdmins,
 }: {
   user: AdminUser;
   paid: boolean;
   meId?: number;
+  canManageAdmins: boolean;
 }) {
   const queryClient = useQueryClient();
   // Every write goes through a confirmation sheet — these rows sit close
@@ -102,10 +107,13 @@ function UserRow({
     },
   });
 
-  // The super admin is the owner account and has no in-app toggle at all;
-  // nobody can demote themselves out of the screen they're standing on.
+  // Only the super admin hands out admin rights. On top of that: the super
+  // admin is the owner account and has no in-app toggle at all, and nobody
+  // can demote themselves out of the screen they're standing on.
   const canToggleAdmin =
-    !user.is_super_admin && !(user.is_admin && user.telegram_user_id === meId);
+    canManageAdmins &&
+    !user.is_super_admin &&
+    !(user.is_admin && user.telegram_user_id === meId);
 
   const name =
     user.first_name || (user.username ? `@${user.username}` : "Noma'lum");
@@ -241,7 +249,7 @@ function UserRow({
       {pending === "promote" && (
         <ConfirmSheet
           title="Admin qilish"
-          body={`${name} (${user.telegram_user_id}) admin panelga to'liq kirish huquqini oladi: barcha foydalanuvchilar, statistika, obunalarni boshqarish va boshqa adminlarni qo'shib-olib tashlash. Shu odamga ishonasizmi?`}
+          body={`${name} (${user.telegram_user_id}) admin panelning "Umumiy" tabini ochadi: statistika, barcha foydalanuvchilar va obunalarni boshqarish. To'lovlar, sessiyalar, baza va adminlarni boshqarish faqat sizda qoladi. Shu odamga ishonasizmi?`}
           confirmLabel="Ha, admin qilish"
           busy={setAdmin.isPending}
           onConfirm={() => setAdmin.mutate(true)}
@@ -294,6 +302,11 @@ export default function AdminPage() {
 
   // Subscription stats, filters and row actions all hang off this one flag.
   const paid = !!me?.subscriptions_enabled;
+  // An ordinary admin sees the overview and nothing else: no payments,
+  // sessions or tables, and no way to promote anyone.
+  const isSuper = !!me?.is_super_admin;
+  const tabs = TABS.filter((t) => isSuper || !("superOnly" in t && t.superOnly));
+  const activeTab = tabs.some((t) => t.key === tab) ? tab : "overview";
   const filters = FILTERS.filter(
     (f) => paid || !("paidOnly" in f && f.paidOnly),
   );
@@ -302,14 +315,14 @@ export default function AdminPage() {
   const { data: stats } = useQuery({
     queryKey: ["admin", "stats"],
     queryFn: () => api.adminStats(),
-    enabled: me?.is_admin === true && tab === "overview",
+    enabled: me?.is_admin === true && activeTab === "overview",
     refetchInterval: 30000,
   });
 
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin", "users", search, activeFilter, limit],
     queryFn: () => api.adminUsers({ search, filter: activeFilter, limit }),
-    enabled: me?.is_admin === true && tab === "overview",
+    enabled: me?.is_admin === true && activeTab === "overview",
   });
 
   // Non-admins never see this screen, even by typing the URL.
@@ -322,23 +335,27 @@ export default function AdminPage() {
     <div className="page">
       <h1>🛠 Admin</h1>
 
-      <div className="admin-tabs">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            className={`admin-tab ${tab === t.key ? "admin-tab-active" : ""}`}
-            onClick={() => setTab(t.key)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {tabs.length > 1 && (
+        <div className="admin-tabs">
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              className={`admin-tab ${
+                activeTab === t.key ? "admin-tab-active" : ""
+              }`}
+              onClick={() => setTab(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {tab === "payments" && <AdminPayments />}
-      {tab === "sessions" && <AdminSessions />}
-      {tab === "tables" && <AdminTables />}
+      {activeTab === "payments" && <AdminPayments />}
+      {activeTab === "sessions" && <AdminSessions />}
+      {activeTab === "tables" && <AdminTables />}
 
-      {tab === "overview" && (
+      {activeTab === "overview" && (
         <>
           {!paid && (
             <p className="notice">
@@ -398,8 +415,12 @@ export default function AdminPage() {
 
           {stats && <DailyScansChart data={stats.daily_scans} />}
 
-          <h2 className="section-title">Adminlar</h2>
-          <AddAdminForm />
+          {isSuper && (
+            <>
+              <h2 className="section-title">Adminlar</h2>
+              <AddAdminForm />
+            </>
+          )}
 
           <h2 className="section-title">Foydalanuvchilar</h2>
 
@@ -437,6 +458,7 @@ export default function AdminPage() {
                   user={u}
                   paid={paid}
                   meId={me?.telegram_user_id}
+                  canManageAdmins={isSuper}
                 />
               ))}
               {users.users.length < users.total && (

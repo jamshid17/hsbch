@@ -51,15 +51,27 @@ FILTERS = {
     "admins": "Admin",
 }
 
+# What an ordinary admin gets: the same ground the Mini App's "Umumiy" tab
+# covers — statistics and the user list, nothing else.
 ADMIN_COMMANDS = [
     ("admin", "Admin panel"),
     ("stats", "Statistika"),
     ("users", "Foydalanuvchilar"),
     ("find", "Foydalanuvchi qidirish"),
+]
+
+# The owner account's extras. /sql isn't listed anywhere on purpose.
+SUPER_ADMIN_COMMANDS = [
     ("payments", "To'lovlar"),
     ("sessions", "Sessiyalar"),
     ("tables", "Jadvallar va qatorlar soni"),
 ]
+
+ONLY_SUPER = "Bu bo'lim faqat asosiy admin uchun."
+
+
+def _is_super(event: Message | CallbackQuery) -> bool:
+    return event.from_user is not None and is_super_admin(event.from_user.id)
 
 
 class IsAdmin(BaseFilter):
@@ -161,19 +173,21 @@ def _back(to: str = "a:menu") -> list[InlineKeyboardButton]:
 # --------------------------------------------------------------------------
 
 
-def _menu_screen() -> tuple[str, InlineKeyboardMarkup]:
+def _menu_screen(super_admin: bool) -> tuple[str, InlineKeyboardMarkup]:
     text = (
         "🗄 <b>Admin panel</b>\n\n"
         "Bazadagi ma'lumotlarni shu yerdan kuzatib turasiz. "
         "Obuna berish/olish esa Mini App'dagi panelda."
     )
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [_b("📊 Statistika", "a:stats"), _b("👥 Foydalanuvchilar", "a:users:all:0")],
-            [_b("💳 To'lovlar", "a:pay:0"), _b("🧾 Sessiyalar", "a:ses:0")],
-            [_b("🗄 Jadvallar", "a:tables")],
-        ]
-    )
+    rows = [
+        [_b("📊 Statistika", "a:stats"), _b("👥 Foydalanuvchilar", "a:users:all:0")],
+    ]
+    # Payments, sessions and the raw tables belong to the owner account alone —
+    # same line the Mini App's panel draws.
+    if super_admin:
+        rows.append([_b("💳 To'lovlar", "a:pay:0"), _b("🧾 Sessiyalar", "a:ses:0")])
+        rows.append([_b("🗄 Jadvallar", "a:tables")])
+    kb = InlineKeyboardMarkup(inline_keyboard=rows)
     return text, kb
 
 
@@ -588,6 +602,9 @@ SCREENS = {
     "tables": _tables_screen,
 }
 
+# Screens the owner account alone may open, by their callback prefix.
+SUPER_SCREENS = {"pay", "ses", "tables"}
+
 
 # --------------------------------------------------------------------------
 # handlers
@@ -611,7 +628,7 @@ async def _edit(cq: CallbackQuery, rendered: tuple[str, InlineKeyboardMarkup]):
 
 @router.message(Command("admin"))
 async def cmd_admin(message: Message):
-    await _send(message, _menu_screen())
+    await _send(message, _menu_screen(_is_super(message)))
 
 
 @router.message(Command("stats"))
@@ -641,18 +658,27 @@ async def cmd_find(message: Message, command: CommandObject):
 
 @router.message(Command("payments"))
 async def cmd_payments(message: Message):
+    if not _is_super(message):
+        await message.answer(ONLY_SUPER)
+        return
     async with AsyncSessionLocal() as db:
         await _send(message, await _payments_screen(db, 0))
 
 
 @router.message(Command("sessions"))
 async def cmd_sessions(message: Message):
+    if not _is_super(message):
+        await message.answer(ONLY_SUPER)
+        return
     async with AsyncSessionLocal() as db:
         await _send(message, await _sessions_screen(db, 0))
 
 
 @router.message(Command("tables"))
 async def cmd_tables(message: Message):
+    if not _is_super(message):
+        await message.answer(ONLY_SUPER)
+        return
     async with AsyncSessionLocal() as db:
         await _send(message, await _tables_screen(db))
 
@@ -737,11 +763,15 @@ def _render_rows(columns: list[str], rows: list) -> str:
     return f"<pre>{_esc(body)}</pre>{note}"
 
 
-async def render_callback(data: str) -> tuple[str, InlineKeyboardMarkup] | None:
+async def render_callback(
+    data: str, super_admin: bool = False
+) -> tuple[str, InlineKeyboardMarkup] | None:
     """Turn a button's callback_data back into the screen it names.
 
     None means "nothing to redraw" — either the page counter, which is a
     label rather than a button, or callback_data this build doesn't know.
+    The owner-only screens are checked here too, not just when drawing the
+    menu, so an ordinary admin can't get in with a kept-around button.
     """
     parts = data.split(":")
     screen = parts[1] if len(parts) > 1 else "menu"
@@ -749,7 +779,9 @@ async def render_callback(data: str) -> tuple[str, InlineKeyboardMarkup] | None:
     if screen == "noop":
         return None
     if screen == "menu":
-        return _menu_screen()
+        return _menu_screen(super_admin)
+    if screen in SUPER_SCREENS and not super_admin:
+        raise PermissionError(ONLY_SUPER)
 
     async with AsyncSessionLocal() as db:
         if screen in SCREENS:
@@ -768,7 +800,10 @@ async def render_callback(data: str) -> tuple[str, InlineKeyboardMarkup] | None:
 @router.callback_query(F.data.startswith("a:"))
 async def on_admin_callback(cq: CallbackQuery):
     try:
-        rendered = await render_callback(cq.data)
+        rendered = await render_callback(cq.data, _is_super(cq))
+    except PermissionError as exc:
+        await cq.answer(str(exc), show_alert=True)
+        return
     except (IndexError, ValueError):
         # Stale keyboard from an older build — say so rather than dying
         # silently on a button that no longer parses.
@@ -788,11 +823,14 @@ async def sync_admin_commands(bot: Bot, chat_id: int, telegram_user_id: int) -> 
     again from someone who has just been demoted.
     """
     admin = await is_admin_async(telegram_user_id)
+    commands = ADMIN_COMMANDS + (
+        SUPER_ADMIN_COMMANDS if is_super_admin(telegram_user_id) else []
+    )
     try:
         scope = BotCommandScopeChat(chat_id=chat_id)
         if admin:
             await bot.set_my_commands(
-                [BotCommand(command=c, description=d) for c, d in ADMIN_COMMANDS],
+                [BotCommand(command=c, description=d) for c, d in commands],
                 scope=scope,
             )
         else:

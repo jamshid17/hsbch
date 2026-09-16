@@ -5,7 +5,11 @@ from app.config import settings
 from app.db import get_db
 from app.models import Assignment, BotUser, Item, Payment, Person, ReceiptScan
 from app.models import Session as SessionModel
-from app.services.admin_auth import is_super_admin, require_admin
+from app.services.admin_auth import (
+    is_super_admin,
+    require_admin,
+    require_super_admin,
+)
 from app.services.telegram_auth import TelegramUser
 from app.timeutil import day_start_utc as _day_start_utc
 from app.timeutil import today_local as _today
@@ -219,7 +223,7 @@ def _user_brief(user: BotUser | None, telegram_user_id: int) -> dict:
 @router.get("/payments")
 def list_payments(
     db: Session = Depends(get_db),
-    _: TelegramUser = Depends(require_admin),
+    _: TelegramUser = Depends(require_super_admin),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):
@@ -262,7 +266,7 @@ def list_payments(
 @router.get("/sessions")
 def list_sessions(
     db: Session = Depends(get_db),
-    _: TelegramUser = Depends(require_admin),
+    _: TelegramUser = Depends(require_super_admin),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):
@@ -310,7 +314,7 @@ def list_sessions(
 @router.get("/tables")
 def list_tables(
     db: Session = Depends(get_db),
-    _: TelegramUser = Depends(require_admin),
+    _: TelegramUser = Depends(require_super_admin),
 ):
     """Row counts per table, plus how much disk the whole thing takes — the
     "is anything actually in there" view you'd otherwise open psql for."""
@@ -447,16 +451,18 @@ def set_admin(
     telegram_user_id: int,
     body: AdminFlagIn,
     db: Session = Depends(get_db),
-    admin: TelegramUser = Depends(require_admin),
+    admin: TelegramUser = Depends(require_super_admin),
 ):
     """Promote someone to admin, or take it away — the whole point being that
     this no longer needs an .env edit and a redeploy.
 
-    Two things are refused outright, both to keep the panel reachable: the
-    super admin can't be demoted by anyone, themselves included — they are the
-    owner account and the guarantee that someone can always get in; and nobody
-    can demote themselves, which is the one mistake that locks the current
-    session out of the screen it was clicking on.
+    Only the super admin may call it: ordinary admins see the overview tab and
+    can't hand out the rights they were given. And even for the owner two
+    things are refused outright, both to keep the panel reachable: the super
+    admin can't be demoted by anyone, themselves included — they are the
+    guarantee that someone can always get in; and nobody can demote
+    themselves, which is the one mistake that locks the current session out of
+    the screen it was clicking on.
     """
     if is_super_admin(telegram_user_id) and not body.is_admin:
         raise HTTPException(

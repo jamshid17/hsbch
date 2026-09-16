@@ -63,7 +63,7 @@ export default function AddAdminForm() {
       {confirming !== null && (
         <ConfirmSheet
           title="Admin qilish"
-          body={`${confirming} ID li foydalanuvchi admin panelga to'liq kirish huquqini oladi: barcha foydalanuvchilar, statistika va boshqa adminlarni boshqarish. ID to'g'ri ekanini tekshirdingizmi?`}
+          body={`${confirming} ID li foydalanuvchi admin panelning "Umumiy" tabini ochadi: statistika, barcha foydalanuvchilar va obunalarni boshqarish. To'lovlar, sessiyalar, baza va adminlarni boshqarish faqat sizda qoladi. ID to'g'ri ekanini tekshirdingizmi?`}
           confirmLabel="Ha, admin qilish"
           busy={promote.isPending}
           onConfirm={() => promote.mutate(confirming)}

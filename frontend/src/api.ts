@@ -112,6 +112,9 @@ export interface MeOut {
   free_total_scans: number;
   subscription_days: number;
   is_admin: boolean;
+  /** The owner account (first id in ADMIN_TELEGRAM_IDS). Ordinary admins only
+   * get the overview tab of the panel. */
+  is_super_admin: boolean;
   card: {
     number: string;
     holder: string;
