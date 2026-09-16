@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "../api";
 import { downscaleImage } from "../lib/image";
-import CardPayment from "../components/CardPayment";
+import Paywall from "../components/Paywall";
 
 export default function ScanPage() {
   const { t } = useTranslation();
@@ -60,6 +60,22 @@ export default function ScanPage() {
     navigate(`/edit/${scanned.sessionId}`);
   }
 
+  // Out of free scans: the picker never appears, so nobody burns a photo on a
+  // request the server would reject with 402 anyway.
+  const locked = !!me && !me.is_subscribed && me.scans_left === 0;
+
+  if (locked && me) {
+    return (
+      <div className="page">
+        <h1>{t("scan.title")}</h1>
+        <Paywall me={me} />
+        <button className="btn btn-ghost" onClick={() => navigate("/")}>
+          {t("paywall.back")}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       <h1>{t("scan.title")}</h1>
@@ -104,9 +120,7 @@ export default function ScanPage() {
       )}
 
       {error && <p className="error">{error}</p>}
-      {quotaExceeded && !me?.is_subscribed && me?.card && (
-        <CardPayment card={me.card} />
-      )}
+      {quotaExceeded && me && !me.is_subscribed && <Paywall me={me} />}
 
       {scanned ? (
         <button className="btn" onClick={handleContinue}>

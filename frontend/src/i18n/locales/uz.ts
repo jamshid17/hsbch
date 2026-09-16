@@ -143,4 +143,15 @@ export default {
     sendReceipt: "@{{admin}} ga chek yuborish",
     or: "yoki",
   },
+  paywall: {
+    title: "Bepul limit tugadi",
+    body: "{{total}} ta bepul skan ishlatildi. Yana chek skanerlash uchun {{days}} kunlik obuna kerak.",
+    how: "Qanday sotib olish",
+    step1: "Quyidagi kartaga {{amount}} so'm o'tkazing",
+    step1NoCard: "@{{admin}} ga yozing va karta raqamini oling",
+    step2: "To'lov chekini (skrinshot) @{{admin}} ga yuboring",
+    step3: "Obuna bir necha daqiqada yoqiladi",
+    close: "Yopish",
+    back: "← Orqaga",
+  },
 } as const;

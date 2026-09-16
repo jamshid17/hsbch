@@ -1,10 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api";
 import { getJoinCode } from "../telegram";
 import CardPayment from "../components/CardPayment";
+import PaywallSheet from "../components/PaywallSheet";
 
 export default function EntryPage() {
   const { t } = useTranslation();
@@ -14,6 +15,10 @@ export default function EntryPage() {
     queryKey: ["me"],
     queryFn: () => api.getMe(),
   });
+
+  const [showPaywall, setShowPaywall] = useState(false);
+  // Scanning is the only gated action — joining someone else's bill stays free.
+  const locked = !!me && !me.is_subscribed && me.scans_left === 0;
 
   // Deep link (?join=CODE or Telegram startapp) → jump straight to join.
   useEffect(() => {
@@ -30,8 +35,12 @@ export default function EntryPage() {
       <h1>{t("entry.title")}</h1>
       <p style={{ color: "var(--hint)", fontSize: 14 }}>{t("entry.subtitle")}</p>
 
-      <button className="btn" onClick={() => navigate("/scan")}>
-        {t("entry.scanBtn")}
+      <button
+        className={`btn ${locked ? "btn-locked" : ""}`}
+        onClick={() => (locked ? setShowPaywall(true) : navigate("/scan"))}
+        aria-disabled={locked}
+      >
+        {locked ? `🔒 ${t("entry.scanBtn")}` : t("entry.scanBtn")}
       </button>
       <button className="btn btn-ghost" onClick={() => navigate("/join")}>
         {t("entry.joinBtn")}
@@ -60,13 +69,17 @@ export default function EntryPage() {
       )}
 
       {/* Out of free scans: this is where the subscription is offered. */}
-      {me && !me.is_subscribed && me.scans_left === 0 && (
+      {locked && me && (
         <>
           <p style={{ color: "var(--hint)", fontSize: 13, textAlign: "center" }}>
             {t("entry.freeUsedUp", { total: me.free_total_scans })}
           </p>
           {me.card && <CardPayment card={me.card} />}
         </>
+      )}
+
+      {showPaywall && me && (
+        <PaywallSheet me={me} onClose={() => setShowPaywall(false)} />
       )}
 
     </div>

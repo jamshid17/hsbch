@@ -143,4 +143,15 @@ export default {
     sendReceipt: "Send receipt to @{{admin}}",
     or: "or",
   },
+  paywall: {
+    title: "Free limit reached",
+    body: "You've used your {{total}} free scans. Scanning more needs a {{days}}-day subscription.",
+    how: "How to subscribe",
+    step1: "Transfer {{amount}} UZS to the card below",
+    step1NoCard: "Message @{{admin}} to get the card number",
+    step2: "Send the receipt (screenshot) to @{{admin}}",
+    step3: "Your subscription is enabled within minutes",
+    close: "Close",
+    back: "← Back",
+  },
 } as const;
