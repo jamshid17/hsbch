@@ -5,9 +5,6 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from app.calculator import unclaimed_items
 from app.db import get_db
-from app.enum import SourceEnum
-from app.models import Session as SessionModel
-from app.schemas import SessionCreate, SessionOut, SessionUpdate
 from app.models import Assignment, Item, Person
 from app.models import Session as SessionModel
 from app.schemas import (
@@ -18,6 +15,7 @@ from app.schemas import (
     PersonOut,
     PickOut,
     SessionOut,
+    SessionUpdate,
 )
 from app.services.ratelimit import SlidingWindowLimiter
 from app.services.telegram_auth import TelegramUser, get_tg_user

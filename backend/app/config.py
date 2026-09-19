@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit
+
 from pydantic_settings import BaseSettings
 
 
@@ -51,6 +53,39 @@ class Settings(BaseSettings):
     # /webhook request — without it, anyone could POST a forged
     # successful_payment update and grant themselves a free subscription.
     telegram_webhook_secret: str
+
+    # Extra browser origins allowed to call the API cross-origin, comma
+    # separated. In production the Mini App and the API sit behind the same
+    # nginx, so nothing is cross-origin and this stays empty; it exists for
+    # preview deployments and anyone running the frontend from elsewhere.
+    cors_extra_origins: str = ""
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """Origins the browser may call the API from.
+
+        `allow_origins=["*"]` was never needed — the Mini App is served from
+        the same host as the API — and it let any page on the internet script
+        requests against it.
+        """
+        origins = {
+            o.strip() for o in self.cors_extra_origins.split(",") if o.strip()
+        }
+        # An Origin header is scheme + host only, so WEBAPP_URL is reduced to
+        # that: a configured "https://hsbch.uz/app" would otherwise match
+        # nothing the browser ever sends. It is also written without a scheme
+        # in practice ("hsbch.uz"), which urlsplit reads as a bare path.
+        raw = self.webapp_url.strip()
+        if raw:
+            parts = urlsplit(raw if "//" in raw else f"https://{raw}")
+            if parts.netloc:
+                origins.add(f"{parts.scheme or 'https'}://{parts.netloc}")
+        if self.dev_allow_unsafe:
+            # The Vite dev server is a different origin from the API.
+            origins.update(
+                ["http://localhost:5173", "http://127.0.0.1:5173"]
+            )
+        return sorted(origins)
 
     @property
     def max_upload_bytes(self) -> int:

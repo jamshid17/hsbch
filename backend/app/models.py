@@ -5,7 +5,6 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     DateTime,
-    Enum,
     ForeignKey,
     Numeric,
     String,
@@ -17,7 +16,6 @@ from sqlalchemy.sql import false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
-from app.enum import SourceEnum
 
 
 def _uuid() -> uuid.UUID:

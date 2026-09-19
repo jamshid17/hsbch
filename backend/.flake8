@@ -1,0 +1,6 @@
+[flake8]
+max-line-length = 150
+# E203 (whitespace before ':') is what black itself produces for slices like
+# `text[start : end + 1]` — the two tools disagree, and black wins here.
+extend-ignore = E203
+exclude = venv,.git,__pycache__

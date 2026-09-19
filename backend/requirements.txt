@@ -1,16 +1,23 @@
-fastapi
-cryptography
-uvicorn[standard]
-sqlalchemy[asyncio]
-psycopg2
-psycopg2-binary
-asyncpg
-alembic
-pydantic
-pydantic-settings
-anthropic
-aiogram
-cryptography
-python-multipart
-httpx
-tzdata
+# Pinned so a deploy installs what was tested, not whatever PyPI published
+# that morning. The build used to float: the same commit could produce two
+# different images a week apart, and a break would look like a code change.
+#
+# To move a pin: bump it here, run the tests, and deploy — the point is that
+# the upgrade is a commit someone chose, not a side effect of rebuilding.
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+sqlalchemy[asyncio]==2.0.54
+# psycopg2-binary ships the same `psycopg2` module as the source package,
+# already built — the source one was listed alongside it and bought nothing
+# but a compiler run on every image build.
+psycopg2-binary==2.9.13
+asyncpg==0.31.0
+alembic==1.20.0
+pydantic==2.13.5
+pydantic-settings==2.15.0
+anthropic==1.7.0
+aiogram==3.31.0
+cryptography==50.0.1
+python-multipart==0.0.32
+httpx==0.28.1
+tzdata==2026.4
