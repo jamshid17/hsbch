@@ -17,6 +17,22 @@ function fmt(value: string | number): string {
   });
 }
 
+/** How much of the receipt's name goes into the share query — enough to say
+ * which bill it is, short enough not to fill the input field. */
+const MAX_QUERY_NAME = 20;
+
+/** "<receipt> <code> <lang>", e.g. "Istanbul 0729 uz" — what sits in the
+ * input field while a chat is picked. The bot reads it from the end, so the
+ * name in front is free to be whatever the receipt is called. */
+function inlineQuery(title: string, code: string, lang: string): string {
+  let name = title.replace(/\s+/g, " ").trim();
+  if (name.length > MAX_QUERY_NAME) {
+    // Cut back to a word boundary rather than mid-word.
+    name = name.slice(0, MAX_QUERY_NAME).replace(/\s\S*$/, "");
+  }
+  return [name, code, lang].filter(Boolean).join(" ");
+}
+
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -83,13 +99,10 @@ export default function SummaryPage() {
       // while the bot can hide it behind "see how it was calculated".
       // The language rides along — the bot can't read the app's own setting.
       try {
-        // The query shows in the input field while a chat is picked, so it's
-        // the short join code people already know, not the session's uuid.
-        tg.switchInlineQuery(`${code} ${i18n.language}`.trim(), [
-          "users",
-          "groups",
-          "channels",
-        ]);
+        tg.switchInlineQuery(
+          inlineQuery(summary.title || "", code, i18n.language),
+          ["users", "groups", "channels"]
+        );
         return;
       } catch {
         // Inline mode off or an older client — the plain dialog still works.

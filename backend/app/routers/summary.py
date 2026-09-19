@@ -23,6 +23,20 @@ ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/jpg"}
 MAX_CAPTION = 1024
 
 
+# How much of the receipt's name goes into the share query — enough to say
+# which bill it is, short enough not to fill the input field.
+MAX_QUERY_NAME = 20
+
+
+def _inline_query(title: str | None, code: str, lang: str) -> str:
+    """"<receipt> <code> <lang>" — what the share button types for the user."""
+    name = " ".join((title or "").split())
+    if len(name) > MAX_QUERY_NAME:
+        # Cut back to a word boundary rather than mid-word.
+        name = name[:MAX_QUERY_NAME].rsplit(" ", 1)[0]
+    return " ".join(p for p in (name, code, lang[:8].strip()) if p)
+
+
 @router.get("/{session_id}/summary", response_model=SummaryOut)
 def get_summary(session_id: uuid.UUID, db: Session = Depends(get_db)):
     session = db.get(SessionModel, session_id)
@@ -102,10 +116,13 @@ async def send_summary_image(
                 InlineKeyboardButton(
                     text=f"📤 {share_label[:48]}",
                     # Lands in the user's input field while they pick a
-                    # chat, so it's the short join code, not the uuid. The
-                    # language rides along — the bot composes the shared
-                    # message and can't see the app's own setting.
-                    switch_inline_query=f"{session.code} {lang[:8]}".strip(),
+                    # chat, so it reads like "Istanbul 0729 uz": the
+                    # receipt, its short join code, and the language (the
+                    # bot writes the shared message and can't see the app's
+                    # own setting). The bot parses it from the end.
+                    switch_inline_query=_inline_query(
+                        session.title, session.code, lang
+                    ),
                 )
             ]
         ]

@@ -156,9 +156,26 @@ async def _deep_link(code: str) -> str | None:
     return f"https://t.me/{_bot_username}?startapp={code}"
 
 
+def _parse_inline_query(raw: str) -> tuple[str, str]:
+    """Pull the session token and the language out of an inline query.
+
+    The query sits in the user's input field while they pick a chat, so it
+    reads like "Istanbul 0729 uz" — the receipt's name, its join code, and
+    the language the Mini App is in. Only the last two words carry meaning;
+    the name is there so the line says what is about to be shared. Buttons
+    posted before this send a bare uuid, sometimes "<uuid>|<lang>" — reading
+    from the end parses those too.
+    """
+    parts = raw.replace("|", " ").split()
+    lang = ""
+    if len(parts) > 1 and parts[-1].lower() in INLINE_LABELS:
+        lang = parts.pop().lower()
+    return (parts[-1].lstrip("#") if parts else ""), lang
+
+
 async def _find_session(db, token: str) -> SessionModel | None:
-    """Resolve an inline query's first word to a session — the short join
-    code, or a uuid from a share button posted before codes were used."""
+    """Resolve an inline query's session token — the short join code, or a
+    uuid from a share button posted before codes were used."""
     try:
         return await db.get(SessionModel, uuid.UUID(token))
     except ValueError:
@@ -171,19 +188,13 @@ async def _find_session(db, token: str) -> SessionModel | None:
 
 @router.inline_query()
 async def handle_inline_query(query: InlineQuery):
-    # "<join code> <language>", e.g. "0729 uz". The query sits in the user's
-    # input field while they pick a chat, so it's the short code people
-    # already know rather than the session's uuid. The language rides along
-    # because the bot composes the message and can't see the Mini App's own
-    # setting. Older buttons still in chats send a uuid, sometimes with a
-    # "|" separator — both are still accepted.
-    raw, _, lang = query.query.strip().replace("|", " ").partition(" ")
+    raw, lang = _parse_inline_query(query.query)
 
     if not raw:
         await query.answer([], cache_time=1)
         return
 
-    L = _labels(lang.strip().lower(), query.from_user.language_code)
+    L = _labels(lang, query.from_user.language_code)
 
     async with AsyncSessionLocal() as db:
         session = await _find_session(db, raw)
