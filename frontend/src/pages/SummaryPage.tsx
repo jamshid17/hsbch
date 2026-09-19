@@ -28,7 +28,7 @@ function downloadBlob(blob: Blob, filename: string) {
 }
 
 export default function SummaryPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
 
@@ -75,6 +75,23 @@ export default function SummaryPage() {
     );
     const text = `🧾 ${t("summary.title")}\n${lines.join("\n")}`;
 
+    if (tg.initData) {
+      // Inline mode, so the bot composes the message: the share dialog can
+      // only send plain text, which leaves the deep link sitting there raw,
+      // while the bot can hide it behind "see how it was calculated".
+      // The language rides along — the bot can't read the app's own setting.
+      try {
+        tg.switchInlineQuery(`${sessionId}|${i18n.language}`, [
+          "users",
+          "groups",
+          "channels",
+        ]);
+        return;
+      } catch {
+        // Inline mode off or an older client — the plain dialog still works.
+      }
+    }
+
     if (tg.initData && shareLink) {
       tg.openTelegramLink(
         `https://t.me/share/url?url=${encodeURIComponent(shareLink)}&text=${encodeURIComponent(text)}`
@@ -115,7 +132,8 @@ export default function SummaryPage() {
             sessionId!,
             blob,
             caption.trim(),
-            t("summary.imageShareLabel")
+            t("summary.imageShareLabel"),
+            i18n.language
           );
           showToast(t("summary.imageSent"));
           return;

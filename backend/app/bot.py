@@ -1,5 +1,6 @@
 import html
 import uuid
+from decimal import Decimal
 
 from aiogram import Bot, Dispatcher, Router
 from aiogram.filters import CommandObject, CommandStart
@@ -78,19 +79,100 @@ async def cmd_start(message: Message, command: CommandObject):
     await message.answer(text)
 
 
+# The inline message is composed by the bot, not the Mini App, so it carries
+# its own copies of the few phrases it needs. The Mini App appends its chosen
+# language to the inline query ("<uuid>|uz"); failing that we fall back to the
+# user's Telegram language, then to Uzbek — the app's own default.
+INLINE_LABELS = {
+    "uz": {
+        "title": "Kim qancha to'laydi",
+        "grand": "Jami",
+        "how": "Qanday hisoblanganini ko'rish",
+        "as_text": "📄 Ro'yxat sifatida yuborish",
+        "as_photo": "🖼 Rasm sifatida yuborish",
+        "people": "{n} kishi",
+    },
+    "ru": {
+        "title": "Кто сколько должен",
+        "grand": "Итого",
+        "how": "Посмотреть, как посчитано",
+        "as_text": "📄 Отправить списком",
+        "as_photo": "🖼 Отправить картинкой",
+        "people": "{n} чел.",
+    },
+    "en": {
+        "title": "Who owes what",
+        "grand": "Grand total",
+        "how": "See how it was calculated",
+        "as_text": "📄 Send as a list",
+        "as_photo": "🖼 Send as a picture",
+        "people": "{n} people",
+    },
+}
+
+
+def _labels(explicit: str, telegram_lang: str | None) -> dict:
+    for code in (explicit, (telegram_lang or "").split("-")[0], "uz"):
+        if code in INLINE_LABELS:
+            return INLINE_LABELS[code]
+    return INLINE_LABELS["uz"]
+
+
+def _esc(text: str) -> str:
+    """Escape for Telegram's HTML parse mode — only & < >.
+
+    Not html.escape()'s default: that also turns an apostrophe into &#x27;,
+    a numeric entity Telegram doesn't decode, so half the Uzbek names and
+    labels in this app would arrive with the escape showing.
+    """
+    return html.escape(text, quote=False)
+
+
+def _fmt(value) -> str:
+    """Space-grouped thousands, comma decimals, .00 dropped — the same shape
+    the Mini App shows, so the shared message matches the screen it came from.
+    Non-breaking spaces, so a total never wraps mid-number.
+    """
+    amount = Decimal(str(value))
+    if amount == amount.to_integral_value():
+        text = f"{int(amount):,}"
+    else:
+        text = f"{amount:,.2f}"
+    return text.replace(",", "\u00a0").replace(".", ",")
+
+
+_bot_username: str | None = None
+
+
+async def _deep_link(code: str) -> str | None:
+    """t.me/<bot>?startapp=<code> — the link behind "see how it was
+    calculated". None if Telegram won't tell us the username."""
+    global _bot_username
+    if _bot_username is None:
+        try:
+            _bot_username = (await bot.me()).username
+        except Exception:
+            return None
+    return f"https://t.me/{_bot_username}?startapp={code}"
+
+
 @router.inline_query()
 async def handle_inline_query(query: InlineQuery):
-    session_id_str = query.query.strip()
+    # "<session uuid>" or "<session uuid>|<language>" — the Mini App appends
+    # the language it is being read in, which the bot has no other way to know.
+    raw, _, lang = query.query.strip().partition("|")
 
-    if not session_id_str:
+    if not raw:
         await query.answer([], cache_time=1)
         return
 
     try:
-        session_id = uuid.UUID(session_id_str)
+        session_id = uuid.UUID(raw)
     except ValueError:
         await query.answer([], cache_time=1)
         return
+
+    L = _labels(lang.strip().lower(), query.from_user.language_code)
 
     async with AsyncSessionLocal() as db:
         session = await db.get(SessionModel, session_id)
@@ -118,48 +200,60 @@ async def handle_inline_query(query: InlineQuery):
         image_file_id = session.summary_image_file_id
 
     cur = session.currency or ""
-    total_all = sum(float(p["total"]) for p in summary)
-    description = f"{len(summary)} people · {cur}{total_all:,.2f} total"
+    total_all = sum(Decimal(str(p["total"])) for p in summary)
+    heading = _esc(session.title or L["title"])
+    description = f"{L['people'].format(n=len(summary))} · {_fmt(total_all)} {cur}".strip()
 
-    # Build receipt text
-    lines = ["🧾 <b>Bill Split</b>", ""]
-    for person in summary:
-        lines.append(f"👤 <b>{person['name']}</b>  —  <b>{cur}{person['total']}</b>")
-        for item in person["items"]:
-            lines.append(f"    • {item['name']}: {cur}{item['share']}")
-        if float(person["extras"]) > 0:
-            lines.append(f"    + tax/tip: {cur}{person['extras']}")
+    # The full breakdown lives behind the deep link, so the message itself
+    # stays a short list of who owes what.
+    lines = []
+    link = await _deep_link(session.code)
+    if link:
+        lines.append(f'🔎 <a href="{link}">{L["how"]}</a>')
         lines.append("")
-
-    lines.append(f"💰 <b>Total: {cur}{total_all:,.2f}</b>")
+    lines.append(f"🧾 <b>{heading}</b>")
+    for person in summary:
+        owed = f"{_fmt(person['total'])} {cur}".strip()
+        lines.append(f"{_esc(person['name'])}: <b>{owed}</b>")
+    lines.append("")
+    grand = f"{_fmt(total_all)} {cur}".strip()
+    lines.append(f"💰 <b>{L['grand']}: {grand}</b>")
     text = "\n".join(lines)
 
-    # The Mini App uploaded a rendered card for this split — share the picture
-    # itself, which reads far better in a group than the same numbers as text.
-    if image_file_id:
-        result = InlineQueryResultCachedPhoto(
-            id=f"{session_id}-photo",
-            photo_file_id=image_file_id,
-            title="Send bill split to this chat",
-            description=description,
-            caption=(
-                f"🧾 <b>{html.escape(session.title or 'Bill Split')}</b>"
-                f" — {cur}{total_all:,.2f}"
-            ),
-            parse_mode="HTML",
-        )
-    else:
-        result = InlineQueryResultArticle(
+    # The picture already spells out every line, so its caption only repeats
+    # the headline and the link. (Telegram caps captions at 1024 chars.)
+    caption_lines = [f"🧾 <b>{heading}</b> — {grand}"]
+    if link:
+        caption_lines.append(f'🔎 <a href="{link}">{L["how"]}</a>')
+    caption = "\n".join(caption_lines)
+
+    results = [
+        InlineQueryResultArticle(
             id=str(session_id),
-            title="Send bill split to this chat",
+            title=L["as_text"],
             description=description,
             input_message_content=InputTextMessageContent(
                 message_text=text,
                 parse_mode="HTML",
             ),
         )
+    ]
 
-    await query.answer([result], cache_time=300, is_personal=True)
+    # The Mini App rendered a card for this split — offer the picture too; in
+    # a group it reads far better than the same numbers as text.
+    if image_file_id:
+        results.append(
+            InlineQueryResultCachedPhoto(
+                id=f"{session_id}-photo",
+                photo_file_id=image_file_id,
+                title=L["as_photo"],
+                description=description,
+                caption=caption,
+                parse_mode="HTML",
+            )
+        )
+
+    await query.answer(results, cache_time=300, is_personal=True)
 
 
 async def process_update(update_data: dict):

@@ -316,12 +316,14 @@ export const api = {
     sessionId: string,
     image: Blob,
     caption: string,
-    shareLabel: string
+    shareLabel: string,
+    lang: string
   ) => {
     const form = new FormData();
     form.append("file", image, "hisob.png");
     form.append("caption", caption);
     form.append("share_label", shareLabel);
+    form.append("lang", lang);
     return request<void>(`/sessions/${sessionId}/summary/image`, {
       method: "POST",
       body: form,

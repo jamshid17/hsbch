@@ -60,6 +60,7 @@ async def send_summary_image(
     file: UploadFile = File(...),
     caption: str = Form(default=""),
     share_label: str = Form(default="Ulashish"),
+    lang: str = Form(default="uz"),
     db: Session = Depends(get_db),
     tg_user: TelegramUser = Depends(get_tg_user),
 ):
@@ -100,7 +101,9 @@ async def send_summary_image(
             [
                 InlineKeyboardButton(
                     text=f"📤 {share_label[:48]}",
-                    switch_inline_query=str(session_id),
+                    # The bot composes the shared message and can't read
+                    # the app's language setting, so it rides along here.
+                    switch_inline_query=f"{session_id}|{lang[:8]}",
                 )
             ]
         ]
