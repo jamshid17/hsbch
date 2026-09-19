@@ -145,6 +145,14 @@ export default {
     summaryNote_many:
         "ℹ️ {{count}} позиций ({{amount}}) никому не назначены и в итог не вошли.",
   },
+  history: {
+    title: "Последние счета",
+    untitled: "Без названия",
+    people: "{{count}} человек",
+    people_few: "{{count}} человека",
+    people_many: "{{count}} человек",
+    open: "не завершён",
+  },
   summary: {
     title: "Кто сколько должен",
     taxTip: "Налог + чаевые",

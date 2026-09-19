@@ -139,6 +139,13 @@ export default {
     summaryNote_other:
         "ℹ️ {{count}} items ({{amount}}) went to nobody and are not in the total.",
   },
+  history: {
+    title: "Recent bills",
+    untitled: "Untitled receipt",
+    people: "{{count}} person",
+    people_other: "{{count}} people",
+    open: "still open",
+  },
   summary: {
     title: "Who owes what",
     taxTip: "Tax + tip share",

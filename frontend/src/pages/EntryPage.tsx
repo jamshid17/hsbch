@@ -7,6 +7,7 @@ import { getJoinToken } from "../telegram";
 import CardPayment from "../components/CardPayment";
 import PaywallSheet from "../components/PaywallSheet";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import SessionHistory from "../components/SessionHistory";
 
 export default function EntryPage() {
   const { t } = useTranslation();
@@ -81,6 +82,8 @@ export default function EntryPage() {
           {me.card && <CardPayment card={me.card} />}
         </>
       )}
+
+      <SessionHistory />
 
       {showPaywall && me && (
         <PaywallSheet me={me} onClose={() => setShowPaywall(false)} />

@@ -51,6 +51,21 @@ export interface SessionOut {
   assignment_mode: string;
 }
 
+/** One line of "my bills" — enough to recognise a dinner, not the split. */
+export interface SessionBrief {
+  id: string;
+  code: string;
+  title: string | null;
+  status: string;
+  currency: string;
+  assignment_mode: string;
+  created_at: string;
+  /** What the receipt came to, not what the reader personally owes. */
+  total: string;
+  people_count: number;
+  is_host: boolean;
+}
+
 export interface ItemOut {
   id: string;
   name: string;
@@ -298,6 +313,10 @@ export const api = {
 
   createSession: () =>
     request<SessionOut>("/sessions", { method: "POST" }),
+
+  /** The bills this person hosted or joined, newest first. */
+  listMySessions: (limit = 10) =>
+    request<SessionBrief[]>(`/sessions/mine?limit=${limit}`),
 
   getSession: (sessionId: string) =>
     request<SessionOut>(`/sessions/${sessionId}`),

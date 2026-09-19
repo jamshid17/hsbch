@@ -8,6 +8,7 @@ from app.models import Assignment, Item, Person
 from app.models import Session as SessionModel
 from app.schemas import (
     FinalizeBody,
+    SessionBrief,
     HostAssignmentsUpdate,
     MyAssignmentsUpdate,
     ParticipantOut,
@@ -20,7 +21,7 @@ from app.services.ratelimit import SlidingWindowLimiter
 from app.services.telegram_auth import TelegramUser, get_tg_user
 from app.ws import manager
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, text
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
@@ -195,6 +196,83 @@ def get_session_by_code(
     if not row:
         raise HTTPException(404, "Session not found")
     return row
+
+
+@router.get("/mine", response_model=list[SessionBrief])
+def list_my_sessions(
+    db: Session = Depends(get_db),
+    user: TelegramUser = Depends(get_tg_user),
+    limit: int = 10,
+):
+    """The bills this person hosted or was part of, newest first.
+
+    Until now a bill was reachable only while its code was in someone's head:
+    leaving the summary lost it for good. Being a participant is what counts,
+    not just hosting — a guest's own history is the half that was missing.
+
+    Declared above /{session_id} on purpose: that route parses its path as a
+    uuid, and "mine" would reach it first and fail as one.
+    """
+    limit = max(1, min(limit, 50))
+    sessions = (
+        db.execute(
+            select(SessionModel)
+            .where(
+                or_(
+                    SessionModel.telegram_chat_id == user.id,
+                    SessionModel.id.in_(
+                        select(Person.session_id).where(
+                            Person.telegram_user_id == user.id
+                        )
+                    ),
+                )
+            )
+            .order_by(SessionModel.created_at.desc())
+            .limit(limit)
+        )
+        .scalars()
+        .all()
+    )
+    if not sessions:
+        return []
+
+    ids = [s.id for s in sessions]
+    # Two grouped queries rather than one per row: a list of ten bills should
+    # not be twenty round trips.
+    subtotals = dict(
+        db.execute(
+            select(Item.session_id, func.sum(Item.price * Item.quantity))
+            .where(Item.session_id.in_(ids))
+            .group_by(Item.session_id)
+        ).all()
+    )
+    headcounts = dict(
+        db.execute(
+            select(Person.session_id, func.count())
+            .where(Person.session_id.in_(ids))
+            .group_by(Person.session_id)
+        ).all()
+    )
+
+    return [
+        SessionBrief(
+            id=s.id,
+            code=s.code,
+            title=s.title,
+            status=s.status,
+            currency=s.currency,
+            assignment_mode=s.assignment_mode,
+            created_at=s.created_at,
+            total=(
+                Decimal(str(subtotals.get(s.id) or 0))
+                + Decimal(str(s.tax))
+                + Decimal(str(s.tip))
+            ),
+            people_count=headcounts.get(s.id, 0),
+            is_host=s.telegram_chat_id == user.id,
+        )
+        for s in sessions
+    ]
 
 
 @router.get("/{session_id}", response_model=SessionOut)

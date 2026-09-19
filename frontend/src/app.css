@@ -195,6 +195,34 @@ h2 {
   line-height: 1.4;
 }
 
+/* ── Home: past bills ── */
+.history-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.history-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-meta {
+  color: var(--hint);
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.history-total {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* ── Scan: the photo well ── */
 .scan-drop {
   align-items: center;

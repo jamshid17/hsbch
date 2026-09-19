@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
@@ -29,6 +30,24 @@ class SessionOut(BaseModel):
     assignment_mode: str = "collaborative"
 
     model_config = {"from_attributes": True}
+
+
+class SessionBrief(BaseModel):
+    """One line of "my bills" — enough to recognise a dinner, not the split."""
+
+    id: uuid.UUID
+    code: str
+    title: Optional[str] = None
+    status: str
+    currency: str
+    assignment_mode: str
+    created_at: datetime
+    # What the receipt came to, items plus tax and tip. Not what the reader
+    # personally owes: that needs the whole calculation, per session, and a
+    # list is not where anyone reads a number that precise.
+    total: Decimal
+    people_count: int
+    is_host: bool
 
 
 class SessionUpdate(BaseModel):

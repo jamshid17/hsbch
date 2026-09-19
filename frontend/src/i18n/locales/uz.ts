@@ -140,6 +140,13 @@ export default {
     summaryNote_other:
         "ℹ️ {{count}} ta mahsulot ({{amount}}) hech kimga biriktirilmagan va bu jamiga kirmagan.",
   },
+  history: {
+    title: "Oxirgi hisoblar",
+    untitled: "Nomsiz chek",
+    people: "{{count}} kishi",
+    people_other: "{{count}} kishi",
+    open: "davom etmoqda",
+  },
   summary: {
     title: "Kim qancha to'laydi",
     taxTip: "Soliq + tip ulushi",
