@@ -5,7 +5,16 @@ import en from "./locales/en";
 import uz from "./locales/uz";
 import ru from "./locales/ru";
 
-const saved = localStorage.getItem("lang") ?? "uz";
+import { preferredLanguage } from "../telegram";
+
+const SUPPORTED = ["uz", "ru", "en"];
+const DEFAULT_LANG = "uz";
+
+const saved = localStorage.getItem("lang");
+const lng =
+  saved && SUPPORTED.includes(saved)
+    ? saved
+    : preferredLanguage(SUPPORTED, DEFAULT_LANG);
 
 i18n.use(initReactI18next).init({
   resources: {
@@ -13,7 +22,7 @@ i18n.use(initReactI18next).init({
     uz: { translation: uz },
     ru: { translation: ru },
   },
-  lng: saved,
+  lng,
   fallbackLng: "en",
   interpolation: { escapeValue: false },
 });

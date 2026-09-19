@@ -9,6 +9,7 @@ import Skeleton from "../components/Skeleton";
 import UnclaimedSheet from "../components/UnclaimedSheet";
 import { fmtQty, MAX_QTY } from "../lib/format";
 import { storage } from "../lib/storage";
+import { haptic } from "../telegram";
 
 // itemId -> personId -> claimed quantity (absent/0 = not assigned)
 type Selection = Record<string, Record<string, number>>;
@@ -99,6 +100,7 @@ export default function AssignPage() {
   });
 
   function togglePerson(itemId: string, personId: string) {
+    haptic.select();
     setSel((prev) => {
       const byPerson = { ...(prev[itemId] || {}) };
       if (byPerson[personId]) delete byPerson[personId];
@@ -174,9 +176,18 @@ export default function AssignPage() {
         return (
           <motion.div
             key={item.id}
-            className="card"
-            style={{ cursor: "pointer", flexDirection: "row", alignItems: "center" }}
+            className="card tappable"
+            style={{ flexDirection: "row", alignItems: "center" }}
+            role="button"
+            tabIndex={0}
+            aria-label={item.name}
             onClick={() => setActiveItem(item)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setActiveItem(item);
+              }
+            }}
             whileTap={{ scale: 0.98 }}
           >
             <div style={{ flex: 1 }}>
@@ -255,7 +266,16 @@ export default function AssignPage() {
                   <div
                     key={person.id}
                     className="check-row"
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={checked}
                     onClick={() => togglePerson(activeItem.id, person.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        togglePerson(activeItem.id, person.id);
+                      }
+                    }}
                   >
                     <div className={clsx("checkmark", { checked })}>{checked && "✓"}</div>
                     <span style={{ fontSize: 16, flex: 1 }}>{person.name}</span>

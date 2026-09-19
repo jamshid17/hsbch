@@ -9,6 +9,7 @@ import {
   compressImage,
   isAcceptedImage,
 } from "../lib/image";
+import { haptic } from "../telegram";
 import Paywall from "../components/Paywall";
 
 export default function ScanPage() {
@@ -16,11 +17,9 @@ export default function ScanPage() {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [quotaExceeded, setQuotaExceeded] = useState(false);
-  const [scanned, setScanned] = useState<{ sessionId: string; title: string } | null>(null);
 
   const { data: me } = useQuery({
     queryKey: ["me"],
@@ -38,21 +37,24 @@ export default function ScanPage() {
     // Android file managers hand over PDFs regardless. Refuse here so nothing
     // is uploaded and no session is created for a file that can never scan.
     if (!isAcceptedImage(f)) {
-      setFile(null);
       setPreview(null);
       setError(t("scan.notAnImage"));
       return;
     }
 
-    setFile(f);
-    setPreview(URL.createObjectURL(f));
+    // Retries pick a new photo; the previous blob has no reader left.
+    setPreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return URL.createObjectURL(f);
+    });
     setError("");
     setQuotaExceeded(false);
-    setScanned(null);
+    // Picking the photo is the decision; there was never a second one to make
+    // on this screen, so scanning starts on the same tap.
+    scan(f);
   }
 
-  async function handleScan() {
-    if (!file) return;
+  async function scan(file: File) {
     setLoading(true);
     setError("");
     setQuotaExceeded(false);
@@ -62,8 +64,10 @@ export default function ScanPage() {
       const image = await compressImage(file);
       const session = await api.createSession();
       await api.uploadReceipt(session.id, image);
+      haptic.success();
       navigate(`/edit/${session.id}`);
     } catch (e: unknown) {
+      haptic.error();
       if (e instanceof ImageTooLargeError) {
         setError(t("scan.tooLarge"));
       } else if (e instanceof ApiError && e.status === 402) {
@@ -72,17 +76,10 @@ export default function ScanPage() {
       } else if (e instanceof ApiError && (e.status === 413 || e.status === 415)) {
         setError(e.message);
       } else {
-        setError(e instanceof Error ? e.message : t("scan.scanning"));
+        setError(e instanceof Error ? e.message : t("scan.failed"));
       }
-    } finally {
       setLoading(false);
     }
-  }
-
-  async function handleContinue() {
-    if (!scanned) return;
-    await api.updateSession(scanned.sessionId, { title: scanned.title });
-    navigate(`/edit/${scanned.sessionId}`);
   }
 
   // Out of free scans: the picker never appears, so nobody burns a photo on a
@@ -103,20 +100,35 @@ export default function ScanPage() {
     );
   }
 
+  const pick = () => {
+    if (loading) return;
+    haptic.select();
+    inputRef.current?.click();
+  };
+
   return (
     <div className="page">
       <h1>{t("scan.title")}</h1>
       <p style={{ color: "var(--hint)", fontSize: 14 }}>{t("scan.subtitle")}</p>
 
       <div
-        className="card"
-        style={{ alignItems: "center", minHeight: 200, justifyContent: "center", cursor: scanned ? "default" : "pointer" }}
-        onClick={() => !scanned && inputRef.current?.click()}
+        className="card scan-drop"
+        role="button"
+        tabIndex={0}
+        aria-busy={loading}
+        aria-label={t("scan.tapToSelect")}
+        onClick={pick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            pick();
+          }
+        }}
       >
         {preview ? (
           <img
             src={preview}
-            alt="Receipt preview"
+            alt=""
             style={{ maxWidth: "100%", maxHeight: 300, borderRadius: 8, objectFit: "contain" }}
           />
         ) : (
@@ -134,15 +146,12 @@ export default function ScanPage() {
         />
       </div>
 
-      {scanned && (
-        <div className="card" style={{ gap: 8 }}>
-          <div className="label">{t("scan.scannedAs")}</div>
-          <input
-            type="text"
-            value={scanned.title}
-            onChange={(e) => setScanned((s) => s ? { ...s, title: e.target.value } : s)}
-            style={{ fontWeight: 600, fontSize: 16 }}
-          />
+      {/* Scanning takes a few seconds and there is nothing to do meanwhile —
+          the status replaces the button rather than sitting next to it. */}
+      {loading && (
+        <div className="scan-status" role="status">
+          <div className="auth-spinner" />
+          <span>{t("scan.scanning")}</span>
         </div>
       )}
 
@@ -151,13 +160,9 @@ export default function ScanPage() {
         <Paywall me={me} />
       )}
 
-      {scanned ? (
-        <button className="btn" onClick={handleContinue}>
-          {t("scan.continueBtn")}
-        </button>
-      ) : (
-        <button className="btn" disabled={!file || loading} onClick={handleScan}>
-          {loading ? t("scan.scanning") : t("scan.scanBtn")}
+      {!loading && (
+        <button className="btn" onClick={pick}>
+          {preview ? t("scan.retry") : t("scan.pickBtn")}
         </button>
       )}
     </div>

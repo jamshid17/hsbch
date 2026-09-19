@@ -245,7 +245,7 @@ export default function SummaryPage() {
         {imageBusy ? t("summary.imageBuilding") : t("summary.shareImageBtn")}
       </button>
 
-      <button className="btn btn-ghost" onClick={() => navigate("/")}>
+      <button className="btn-link" onClick={() => navigate("/")}>
         {t("summary.splitAnother")}
       </button>
 

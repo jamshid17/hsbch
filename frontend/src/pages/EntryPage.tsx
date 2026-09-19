@@ -6,6 +6,7 @@ import { api } from "../api";
 import { getJoinCode } from "../telegram";
 import CardPayment from "../components/CardPayment";
 import PaywallSheet from "../components/PaywallSheet";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 export default function EntryPage() {
   const { t } = useTranslation();
@@ -85,6 +86,14 @@ export default function EntryPage() {
         <PaywallSheet me={me} onClose={() => setShowPaywall(false)} />
       )}
 
+      {/* The language is picked once, and the build number is only ever
+          checked after a deploy — neither belongs on every screen. */}
+      <div className="entry-footer">
+        <LanguageSwitcher />
+        <span className="app-version">
+          v{import.meta.env.VITE_APP_VERSION ?? "dev"}
+        </span>
+      </div>
     </div>
   );
 }

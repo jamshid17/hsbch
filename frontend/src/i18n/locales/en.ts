@@ -2,8 +2,7 @@ export default {
   steps: {
     scan: "Scan",
     items: "Items",
-    collect: "Collect",
-    summary: "Summary",
+    split: "Split",
   },
   landing: {
     title: "Bill Splitter",
@@ -26,12 +25,12 @@ export default {
   },
   scan: {
     title: "Bill Splitter",
-    subtitle: "Take a photo of your receipt and we'll split it for you.",
+    subtitle: "Pick a photo of the receipt — we'll do the rest.",
     tapToSelect: "Tap to select receipt photo",
-    scanBtn: "Scan Receipt",
-    scanning: "Scanning…",
-    scannedAs: "Scanned as",
-    continueBtn: "Continue →",
+    pickBtn: "📷 Pick receipt photo",
+    retry: "Pick another photo",
+    scanning: "Reading the receipt…",
+    failed: "Couldn't read the receipt. Try a clearer photo.",
     notAnImage: "Please upload a receipt photo only (JPG, PNG). PDFs and other files aren't accepted.",
     tooLarge: "Couldn't compress the image. Pick another photo or retake the receipt.",
   },
@@ -50,7 +49,6 @@ export default {
     tip: "Tip",
     modeAmount: "Amount",
     addItem: "+ Add item",
-    next: "Open session →",
     saving: "Saving…",
     failedLoad: "Failed to load items",
     failedSave: "Failed to save",
@@ -58,13 +56,10 @@ export default {
   },
   mode: {
     title: "How do you want to split?",
-    subtitle: "Choose how this bill gets divided up.",
     collaborative: "Everyone picks their own",
     collaborativeDesc: "Share a code — everyone joins and picks what they had.",
     hostAssigns: "I'll assign for everyone",
     hostAssignsDesc: "No one else opens the app — you enter names and mark who had what yourself.",
-    saving: "Saving…",
-    failedSave: "Failed to save",
   },
   people: {
     title: "Participants",
@@ -98,6 +93,7 @@ export default {
     notFound: "No session found for that code",
   },
   pick: {
+    alsoTaken: "👥 Also taken by {{names}}",
     title: "What did you have?",
     subtitle: "Tap the items you ordered. Use − / + for shared portions.",
     yourTotal: "Your subtotal",

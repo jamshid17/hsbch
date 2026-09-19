@@ -56,6 +56,10 @@ export default function HostLivePage() {
   // out a split that's short by their price. Ask before that happens.
   const unclaimed = summary?.unclaimed ?? [];
   const unclaimedTotal = parseFloat(summary?.unclaimed_total ?? "0");
+  // The host arrives here straight from the edit screen, when of course
+  // nothing is picked yet. Warning then would be shouting about the starting
+  // line; it only means something once people have begun.
+  const started = !!summary?.people.some((p) => p.items.length > 0);
 
   function handleFinalize() {
     if (unclaimed.length > 0) setAskUnclaimed(true);
@@ -164,7 +168,7 @@ export default function HostLivePage() {
         {t("host.pickMine")}
       </button>
 
-      {unclaimed.length > 0 && (
+      {started && unclaimed.length > 0 && (
         <p className="notice notice-warn">
           {t("unclaimed.notice", {
             count: unclaimed.length,

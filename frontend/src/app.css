@@ -152,7 +152,13 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--gap);
-  min-height: calc(100dvh - 90px);
+  min-height: calc(100dvh - 46px);
+}
+
+/* Screens with no step bar own the whole viewport, so anything anchored to
+   the bottom of .page (the home footer) actually sits at the bottom. */
+body:not(:has(.top-bar)) .page {
+  min-height: 100dvh;
 }
 
 h1 {
@@ -178,6 +184,50 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* Explains the button directly above it — close enough to read as one unit. */
+.fork-hint {
+  margin: -6px 0 2px;
+  padding: 0 2px;
+  color: var(--hint);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* ── Scan: the photo well ── */
+.scan-drop {
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  cursor: pointer;
+  border: 1.5px dashed color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+.scan-drop:focus-visible {
+  outline: 2px solid var(--button);
+  outline-offset: 2px;
+}
+
+.scan-drop[aria-busy="true"] {
+  cursor: progress;
+  opacity: 0.75;
+}
+
+.scan-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--hint);
+  font-size: 15px;
+  padding: 4px 0;
+}
+
+.scan-status .auth-spinner {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
 }
 
 /* ── Manual card payment ── */
@@ -410,6 +460,12 @@ input:focus {
   border-bottom: none;
 }
 
+.check-row:focus-visible {
+  outline: 2px solid var(--button);
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+
 .checkmark {
   width: 24px;
   height: 24px;
@@ -576,6 +632,38 @@ input:focus {
   pointer-events: none;
 }
 
+/* Anything the finger treats as a button: a visible focus ring for the
+   keyboard, and the pointer for the mouse. */
+.tappable {
+  cursor: pointer;
+}
+
+.tappable:focus-visible {
+  outline: 2px solid var(--button);
+  outline-offset: 2px;
+}
+
+/* Who else is on this item — the whole reason for picking together. */
+.item-others {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--link);
+}
+
+/* A way out of the screen, not a second thing to do on it. */
+.btn-link {
+  display: block;
+  width: 100%;
+  padding: 6px;
+  border: none;
+  background: none;
+  color: var(--link);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
 /* ── Pick page: selected card + quantity stepper ── */
 .card-selected {
   outline: 2px solid var(--button);
@@ -612,17 +700,21 @@ input:focus {
   font-size: 16px;
 }
 
-/* Deploy version badge — top-right of the sticky navbar */
+/* Home-screen footer: language, and the deploy number for whoever asks. */
+.entry-footer {
+  margin-top: auto;
+  padding-top: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
 .app-version {
-  position: absolute;
-  top: 5px;
-  right: 10px;
   font-size: 11px;
   font-weight: 600;
   color: var(--hint);
   opacity: 0.7;
-  z-index: 6;
-  pointer-events: none;
 }
 
 /* Auth gate spinner */

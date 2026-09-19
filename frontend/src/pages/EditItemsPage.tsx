@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
+import clsx from "clsx";
 import { api, ItemOut } from "../api";
 import Skeleton from "../components/Skeleton";
 import { clampQty, fmtQty, MAX_QTY } from "../lib/format";
+import { haptic } from "../telegram";
 
 interface EditableItem {
   id?: string;
@@ -17,9 +19,21 @@ interface EditableItem {
 
 interface SessionBasic { currency: string; tax: string; tip: string; title?: string; }
 
+/** How the items get shared out — asked here, at the end of the edit, rather
+ * than on a screen of its own: it is one question, and the host is already
+ * looking at the very list it applies to. */
+type Mode = "collaborative" | "host_assigns";
+
 function emptyItem(): EditableItem {
   return { name: "", price: "", quantity: "1", unit: "pcs" };
 }
+
+/** Offered as taps. Whatever the receipt itself said is added in front, so
+ * the scanned currency is always among them and nothing has to be typed. */
+const COMMON_CURRENCIES = ["so'm", "$", "€", "₽"];
+
+/** Tips people actually leave — the percent field starts empty otherwise. */
+const TIP_PERCENTS = [5, 10, 15];
 
 /** Tax/tip input that can be entered as a fixed amount or as a % of subtotal. */
 function AmountPercentField({
@@ -33,6 +47,7 @@ function AmountPercentField({
   onPct,
   computed,
   currency,
+  quickPercents,
 }: {
   label: string;
   amountLabel: string;
@@ -44,6 +59,7 @@ function AmountPercentField({
   onPct: (v: string) => void;
   computed: number;
   currency: string;
+  quickPercents?: number[];
 }) {
   return (
     <div>
@@ -82,6 +98,20 @@ function AmountPercentField({
         />
       ) : (
         <>
+          {quickPercents && (
+            <div className="chip-row" style={{ marginBottom: 8 }}>
+              {quickPercents.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  className={clsx("chip", { "chip-active": pct === String(p) })}
+                  onClick={() => onPct(String(p))}
+                >
+                  {p}%
+                </button>
+              ))}
+            </div>
+          )}
           <input
             type="number"
             inputMode="decimal"
@@ -109,6 +139,8 @@ export default function EditItemsPage() {
   const [items, setItems] = useState<EditableItem[]>([]);
   const [title, setTitle] = useState("");
   const [currency, setCurrency] = useState("");
+  // Captured once, so tapping a chip never reshuffles the row under the finger.
+  const [scannedCurrency, setScannedCurrency] = useState("");
   const [tax, setTax] = useState("0");
   const [tip, setTip] = useState("0");
   const [taxMode, setTaxMode] = useState<"amount" | "pct">("amount");
@@ -133,11 +165,20 @@ export default function EditItemsPage() {
     if (!data || initialized) return;
     setItems(data.rawItems.map((i) => ({ id: i.id, name: i.name, price: i.price, quantity: clampQty(fmtQty(i.quantity)), unit: i.unit })));
     setCurrency(data.session.currency ?? "");
+    setScannedCurrency(data.session.currency ?? "");
     setTax(data.session.tax ?? "0");
     setTip(data.session.tip ?? "0");
     setTitle(data.session.title ?? "");
     setInitialized(true);
   }, [data, initialized]);
+
+  const currencyOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([scannedCurrency, ...COMMON_CURRENCIES].filter(Boolean))
+      ),
+    [scannedCurrency]
+  );
 
   const subtotal = items.reduce(
     (sum, i) => sum + (parseFloat(i.price) || 0) * (parseFloat(i.quantity) || 0),
@@ -149,7 +190,7 @@ export default function EditItemsPage() {
     tipMode === "pct" ? (subtotal * (parseFloat(tipPct) || 0)) / 100 : parseFloat(tip) || 0;
 
   const saveMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async (mode: Mode) => {
       // Sanitize: coerce blank price/qty to valid numbers (avoids the backend
       // decimal-parsing error) and drop empty junk rows (e.g. from scanning a
       // non-receipt photo).
@@ -163,19 +204,31 @@ export default function EditItemsPage() {
         .filter((i) => i.name !== "" || parseFloat(i.price) > 0);
 
       if (cleanItems.length === 0) {
-        return Promise.reject(new Error(t("edit.needItem")));
+        throw new Error(t("edit.needItem"));
       }
 
-      return api.updateItems(sessionId!, {
+      await api.updateItems(sessionId!, {
         items: cleanItems,
         currency,
         tax: effectiveTax.toFixed(2),
         tip: effectiveTip.toFixed(2),
       });
+      await api.updateSession(sessionId!, { assignment_mode: mode });
+      return mode;
     },
-    onSuccess: () => navigate(`/mode/${sessionId}`),
+    // Collaborative hosts land on the code screen, not on their own picks:
+    // sharing is what the others are waiting for, and picking their own food
+    // is one tap away from there.
+    onSuccess: (mode) => {
+      haptic.success();
+      navigate(mode === "collaborative" ? `/host/${sessionId}` : `/people/${sessionId}`);
+    },
     onError: (e: unknown) => setError(e instanceof Error ? e.message : t("edit.failedSave")),
   });
+
+  // Which of the two buttons is waiting — the spinner belongs on the one that
+  // was actually pressed, not on whichever comes first.
+  const pendingMode = saveMutation.isPending ? saveMutation.variables : undefined;
 
   function updateItem(idx: number, field: keyof EditableItem, value: string) {
     const v = field === "quantity" ? clampQty(value) : value;
@@ -247,7 +300,21 @@ export default function EditItemsPage() {
       <div className="card">
         <div>
           <div className="label">{t("edit.currency")}</div>
-          <input type="text" value={currency} onChange={(e) => setCurrency(e.target.value)} placeholder="$" />
+          <div className="chip-row">
+            {currencyOptions.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className={clsx("chip", { "chip-active": c === currency })}
+                onClick={() => {
+                  haptic.select();
+                  setCurrency(c);
+                }}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
         </div>
 
         <AmountPercentField
@@ -274,14 +341,36 @@ export default function EditItemsPage() {
           onPct={setTipPct}
           computed={effectiveTip}
           currency={currency}
+          quickPercents={TIP_PERCENTS}
         />
       </div>
 
       {error && <p className="error">{error}</p>}
 
-      <button className="btn" disabled={saveMutation.isPending || items.length === 0} onClick={() => saveMutation.mutate()}>
-        {saveMutation.isPending ? t("edit.saving") : t("edit.next")}
+      {/* The fork that used to be a screen of its own. */}
+      <h2 style={{ marginTop: 8 }}>{t("mode.title")}</h2>
+
+      <button
+        className="btn"
+        disabled={saveMutation.isPending || items.length === 0}
+        onClick={() => saveMutation.mutate("collaborative")}
+      >
+        {pendingMode === "collaborative"
+          ? t("edit.saving")
+          : `👥 ${t("mode.collaborative")}`}
       </button>
+      <p className="fork-hint">{t("mode.collaborativeDesc")}</p>
+
+      <button
+        className="btn btn-ghost"
+        disabled={saveMutation.isPending || items.length === 0}
+        onClick={() => saveMutation.mutate("host_assigns")}
+      >
+        {pendingMode === "host_assigns"
+          ? t("edit.saving")
+          : `✍️ ${t("mode.hostAssigns")}`}
+      </button>
+      <p className="fork-hint">{t("mode.hostAssignsDesc")}</p>
     </div>
   );
 }

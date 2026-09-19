@@ -2,8 +2,7 @@ export default {
   steps: {
     scan: "Skan",
     items: "Mahsulotlar",
-    collect: "Yig'ish",
-    summary: "Xulosa",
+    split: "Taqsimlash",
   },
   landing: {
     title: "Hisob bo'luvchi",
@@ -26,12 +25,12 @@ export default {
   },
   scan: {
     title: "Hisob bo'luvchi",
-    subtitle: "Chek rasmini oling, biz taqsimlab beramiz.",
+    subtitle: "Chek rasmini tanlang — qolganini o'zimiz qilamiz.",
     tapToSelect: "Chek rasmini tanlash uchun bosing",
-    scanBtn: "Chekni skanerlash",
-    scanning: "Skanerlanmoqda…",
-    scannedAs: "Chek nomi",
-    continueBtn: "Davom etish →",
+    pickBtn: "📷 Chek rasmini tanlash",
+    retry: "Boshqa rasm tanlash",
+    scanning: "Chek o'qilmoqda…",
+    failed: "Chekni o'qib bo'lmadi. Aniqroq rasm bilan urinib ko'ring.",
     notAnImage: "Faqat chek rasmini yuklang (JPG, PNG). PDF va boshqa fayllar qabul qilinmaydi.",
     tooLarge: "Rasmni siqib bo'lmadi. Boshqa rasm tanlang yoki chekni qaytadan suratga oling.",
   },
@@ -50,7 +49,6 @@ export default {
     tip: "Tip",
     modeAmount: "Summa",
     addItem: "+ Mahsulot qo'shish",
-    next: "Sessiyani ochish →",
     saving: "Saqlanmoqda…",
     failedLoad: "Mahsulotlarni yuklashda xato",
     failedSave: "Saqlashda xato",
@@ -58,13 +56,10 @@ export default {
   },
   mode: {
     title: "Qanday bo'lasiz?",
-    subtitle: "Hisobni qanday taqsimlashni tanlang.",
     collaborative: "Hammasi o'zi tanlaydi",
     collaborativeDesc: "Kod ulashing — har kim qo'shilib o'zi yegan taomni tanlaydi.",
     hostAssigns: "Men hammaning o'rniga tanlayman",
     hostAssignsDesc: "Boshqalar ilovaga kirmaydi — siz ismlarni kiritib, kimga nima tegishli ekanini o'zingiz belgilaysiz.",
-    saving: "Saqlanmoqda…",
-    failedSave: "Saqlashda xato",
   },
   people: {
     title: "Ishtirokchilar",
@@ -98,6 +93,7 @@ export default {
     notFound: "Bu code bo'yicha sessiya topilmadi",
   },
   pick: {
+    alsoTaken: "👥 {{names}} ham oldi",
     title: "Siz nima yedingiz?",
     subtitle: "O'zingiz buyurtma qilgan taomlarni bosing. Umumiy porsiya uchun − / +.",
     yourTotal: "Sizning summa",

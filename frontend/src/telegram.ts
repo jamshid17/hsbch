@@ -54,12 +54,50 @@ export function authHeaders(): Record<string, string> {
   };
 }
 
+/**
+ * The language to open in, when nothing has been chosen yet.
+ *
+ * Telegram knows which language the person reads, so asking them again is a
+ * step that buys nothing. `language_code` is a base tag ("ru") or a full one
+ * ("pt-BR"); anything unsupported falls back to Uzbek.
+ */
+export function preferredLanguage(supported: string[], fallback: string): string {
+  const code = WebApp.initDataUnsafe?.user?.language_code ?? "";
+  const base = code.toLowerCase().split("-")[0];
+  return supported.includes(base) ? base : fallback;
+}
+
 /** Join code from a deep link: ?join=CODE or Telegram startapp start_param. */
 export function getJoinCode(): string | null {
   const fromQuery = new URLSearchParams(window.location.search).get("join");
   const fromStart = WebApp.initDataUnsafe?.start_param;
   return (fromQuery || fromStart || "").toUpperCase() || null;
 }
+
+/**
+ * Telegram's haptics, safe to call anywhere.
+ *
+ * The API only exists inside a recent Telegram client — in a browser (which
+ * is where dev testing happens) and in older clients the calls are missing or
+ * throw, and a buzz is never worth an exception.
+ */
+function buzz(run: (h: NonNullable<typeof tg.HapticFeedback>) => void) {
+  try {
+    const h = tg.HapticFeedback;
+    if (h) run(h);
+  } catch {
+    /* no haptics here */
+  }
+}
+
+export const haptic = {
+  /** A choice was made: an item picked, a screen entered. */
+  select: () => buzz((h) => h.selectionChanged()),
+  /** Something finished the way the user wanted. */
+  success: () => buzz((h) => h.notificationOccurred("success")),
+  /** Something went wrong. */
+  error: () => buzz((h) => h.notificationOccurred("error")),
+};
 
 export function setMainButton(text: string, onClick: () => void) {
   tg.MainButton.setText(text);

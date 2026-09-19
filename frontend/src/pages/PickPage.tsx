@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 import { api, ItemOut, ParticipantOut } from "../api";
-import { getTelegramUser } from "../telegram";
+import { getTelegramUser, haptic } from "../telegram";
 import { fmtQty, MAX_QTY } from "../lib/format";
 import { useSessionSocket } from "../lib/useSessionSocket";
 import Skeleton from "../components/Skeleton";
@@ -77,6 +77,18 @@ export default function PickPage() {
     return map;
   }, [participants, myId]);
 
+  const othersByItem = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    participants?.forEach((p) => {
+      if (p.telegram_user_id === myId) return;
+      p.picks.forEach((pk) => {
+        if (Number(pk.quantity) <= 0) return;
+        (map[pk.item_id] ||= []).push(p.name);
+      });
+    });
+    return map;
+  }, [participants, myId]);
+
   const cur = session?.currency || "";
 
   const subtotal = useMemo(() => {
@@ -93,6 +105,7 @@ export default function PickPage() {
   }, [items, sel, othersQty]);
 
   function toggle(itemId: string) {
+    haptic.select();
     setSaved(false);
     setSel((prev) => {
       const next = { ...prev };
@@ -153,12 +166,22 @@ export default function PickPage() {
         const selected = !!sel[item.id];
         const qty = sel[item.id] || 0;
         const multi = parseFloat(item.quantity) > 1;
+        const others = othersByItem[item.id] ?? [];
         return (
           <motion.div
             key={item.id}
-            className={clsx("card", { "card-selected": selected })}
-            style={{ cursor: "pointer", flexDirection: "row", alignItems: "center", gap: 12 }}
+            className={clsx("card", "tappable", { "card-selected": selected })}
+            style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+            role="button"
+            tabIndex={0}
+            aria-pressed={selected}
             onClick={() => toggle(item.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                toggle(item.id);
+              }
+            }}
             whileTap={{ scale: 0.98 }}
           >
             <div className={clsx("checkmark", { checked: selected })}>
@@ -170,6 +193,11 @@ export default function PickPage() {
                 {fmtQty(item.quantity)} {item.unit} × {cur}
                 {fmt(parseFloat(item.price))}
               </div>
+              {others.length > 0 && (
+                <div className="item-others">
+                  {t("pick.alsoTaken", { names: others.join(", ") })}
+                </div>
+              )}
             </div>
             {selected && multi && (
               <div className="qty-stepper" onClick={(e) => e.stopPropagation()}>
@@ -204,7 +232,7 @@ export default function PickPage() {
       </button>
 
       <button
-        className="btn btn-ghost"
+        className="btn-link"
         onClick={() => navigate(`/summary/${sessionId}`)}
       >
         {t("pick.viewSummary")}

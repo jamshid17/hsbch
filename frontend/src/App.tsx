@@ -4,7 +4,6 @@ import { tg } from "./telegram";
 import EntryPage from "./pages/EntryPage";
 import ScanPage from "./pages/ScanPage";
 import EditItemsPage from "./pages/EditItemsPage";
-import ModePage from "./pages/ModePage";
 import JoinPage from "./pages/JoinPage";
 import PickPage from "./pages/PickPage";
 import HostLivePage from "./pages/HostLivePage";
@@ -13,7 +12,6 @@ import AssignPage from "./pages/AssignPage";
 import SummaryPage from "./pages/SummaryPage";
 import AdminPage from "./pages/AdminPage";
 import ProgressSteps from "./components/ProgressSteps";
-import LanguageSwitcher from "./components/LanguageSwitcher";
 import "./app.css";
 
 // Show the native Telegram back button on every screen except the home/entry
@@ -45,16 +43,11 @@ export default function App() {
   useTelegramBackButton();
   return (
     <>
-      <div className="top-bar">
-        <span className="app-version">v{import.meta.env.VITE_APP_VERSION ?? "dev"}</span>
-        <ProgressSteps />
-        <LanguageSwitcher />
-      </div>
+      <ProgressSteps />
       <Routes>
         <Route path="/" element={<EntryPage />} />
         <Route path="/scan" element={<ScanPage />} />
         <Route path="/edit/:sessionId" element={<EditItemsPage />} />
-        <Route path="/mode/:sessionId" element={<ModePage />} />
         <Route path="/join" element={<JoinPage />} />
         <Route path="/pick/:sessionId" element={<PickPage />} />
         <Route path="/host/:sessionId" element={<HostLivePage />} />
