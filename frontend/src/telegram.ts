@@ -67,11 +67,19 @@ export function preferredLanguage(supported: string[], fallback: string): string
   return supported.includes(base) ? base : fallback;
 }
 
-/** Join code from a deep link: ?join=CODE or Telegram startapp start_param. */
-export function getJoinCode(): string | null {
+/**
+ * What a deep link points at: ?join=<token> or Telegram's startapp param.
+ *
+ * Either a session id or a join code. Links posted into a chat carry the id,
+ * because a code goes back in the pool after a month and would eventually
+ * point at someone else's bill; a code still arrives from links shared
+ * before that, and from anyone typing one in. Not upper-cased any more — it
+ * may be a uuid.
+ */
+export function getJoinToken(): string | null {
   const fromQuery = new URLSearchParams(window.location.search).get("join");
   const fromStart = WebApp.initDataUnsafe?.start_param;
-  return (fromQuery || fromStart || "").toUpperCase() || null;
+  return (fromQuery || fromStart || "").trim() || null;
 }
 
 /**

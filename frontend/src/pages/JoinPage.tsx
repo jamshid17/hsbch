@@ -1,48 +1,67 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { api } from "../api";
+import { api, SessionOut } from "../api";
+import { haptic } from "../telegram";
 
 const CODE_LEN = 4;
+
+/** A deep link carries a session id; a person at the table types four digits. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default function JoinPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [params] = useSearchParams();
 
+  const token = (params.get("code") || "").trim();
+  // Only a typed code belongs in the input; a session id from a deep link is
+  // resolved below without ever being shown.
   const [code, setCode] = useState(
-    (params.get("code") || "").replace(/\D/g, "").slice(0, CODE_LEN)
+    UUID.test(token) ? "" : token.replace(/\D/g, "").slice(0, CODE_LEN)
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const autoTried = useRef(false);
 
-  async function join(rawCode: string) {
-    const c = rawCode.replace(/\D/g, "");
-    if (c.length !== CODE_LEN) return;
+  /** A finished bill is a result to read, not one to join and pick from. */
+  async function open(session: SessionOut) {
+    if (session.status === "done") {
+      navigate(`/summary/${session.id}`, { replace: true });
+      return;
+    }
+    await api.joinSession(session.id);
+    haptic.success();
+    navigate(`/pick/${session.id}`, { replace: true });
+  }
+
+  async function resolve(raw: string) {
+    const value = raw.trim();
     setLoading(true);
     setError("");
     try {
-      const session = await api.getSessionByCode(c);
-      // A finished bill: just show the result, don't (re)join to pick items.
-      if (session.status === "done") {
-        navigate(`/summary/${session.id}`, { replace: true });
-        return;
-      }
-      await api.joinSession(session.id);
-      navigate(`/pick/${session.id}`, { replace: true });
+      await open(
+        UUID.test(value)
+          ? await api.getSession(value)
+          : await api.getSessionByCode(value.replace(/\D/g, ""))
+      );
     } catch {
+      haptic.error();
       setError(t("join.notFound"));
       setLoading(false);
     }
   }
 
-  // Auto-join when arriving via a deep link with ?code=.
+  function joinByCode() {
+    if (code.length === CODE_LEN) resolve(code);
+  }
+
+  // Arriving via a deep link: resolve it without making them press anything.
   useEffect(() => {
-    const c = params.get("code");
-    if (c && !autoTried.current) {
-      autoTried.current = true;
-      join(c);
+    if (!token || autoTried.current) return;
+    autoTried.current = true;
+    if (UUID.test(token) || token.replace(/\D/g, "").length === CODE_LEN) {
+      resolve(token);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -62,6 +81,7 @@ export default function JoinPage() {
         }
         placeholder={t("join.placeholder")}
         maxLength={CODE_LEN}
+        aria-label={t("join.title")}
         style={{
           fontSize: 32,
           letterSpacing: 12,
@@ -75,7 +95,7 @@ export default function JoinPage() {
       <button
         className="btn"
         disabled={loading || code.length !== CODE_LEN}
-        onClick={() => join(code)}
+        onClick={joinByCode}
       >
         {loading ? t("join.joining") : t("join.joinBtn")}
       </button>

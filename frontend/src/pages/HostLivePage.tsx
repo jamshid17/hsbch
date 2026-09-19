@@ -69,11 +69,14 @@ export default function HostLivePage() {
   const code = session?.code || "";
   const cur = summary?.currency || "";
 
-  // Deep link that opens the Mini App and auto-joins this session. Tapping it
-  // sets Telegram's start_param=<code>, which the app reads to jump to /join.
+  // Deep link that opens the Mini App and auto-joins this session. It carries
+  // the session id rather than the code: the link sits in a chat afterwards,
+  // and a code returns to the pool after a month — a link built from one would
+  // start opening whichever bill holds that code by then. The code itself is
+  // still on screen above, for reading out across the table.
   const inviteLink = config?.bot_username
-    ? `https://t.me/${config.bot_username}?startapp=${code}`
-    : `${window.location.origin}/?join=${code}`;
+    ? `https://t.me/${config.bot_username}?startapp=${sessionId}`
+    : `${window.location.origin}/?join=${sessionId}`;
 
   async function shareCode() {
     if (tg.initData) {

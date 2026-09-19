@@ -12,7 +12,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.sql import false
+from sqlalchemy.sql import false, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -28,10 +28,11 @@ class Session(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=_uuid
     )
-    # Short human-friendly code others type to join this session.
-    code: Mapped[str] = mapped_column(
-        String(8), nullable=False, unique=True, index=True
-    )
+    # Short human-friendly code others type to join this session. Not unique
+    # across all time: four digits is ten thousand of them, and a bill that
+    # holds one forever would eventually take the last. A code belongs to a
+    # session only while the session is recent — see routers/sessions.py.
+    code: Mapped[str] = mapped_column(String(8), nullable=False, index=True)
     # Telegram user id of the host who created the session.
     telegram_chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     currency: Mapped[str] = mapped_column(String(10), nullable=False, default="")
@@ -48,6 +49,16 @@ class Session(Base):
     # inline share result can resend the same photo without re-uploading it.
     summary_image_file_id: Mapped[str | None] = mapped_column(
         String(256), nullable=True
+    )
+    # Inherited from Base like every other table's; restated here only to add
+    # the index, because allocating and resolving a join code both filter on
+    # it now. Naive UTC, like every timestamp in this schema (see timeutil).
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=func.now(),
+        server_default=func.now(),
+        index=True,
     )
 
     items: Mapped[list["Item"]] = relationship(

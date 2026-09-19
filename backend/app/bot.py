@@ -23,6 +23,7 @@ from app.bot_admin import sync_admin_commands
 from app.calculator import calculate_summary
 from app.config import settings
 from app.db import AsyncSessionLocal
+from app.joincode import lookup_cutoff
 from app.models import Assignment, Item, Person
 from app.models import Session as SessionModel
 
@@ -144,16 +145,23 @@ def _fmt(value) -> str:
 _bot_username: str | None = None
 
 
-async def _deep_link(code: str) -> str | None:
-    """t.me/<bot>?startapp=<code> — the link behind "see how it was
-    calculated". None if Telegram won't tell us the username."""
+async def _deep_link(session_id: uuid.UUID) -> str | None:
+    """t.me/<bot>?startapp=<session id> — the link behind "see how it was
+    calculated". None if Telegram won't tell us the username.
+
+    The id, not the join code: this link is posted into a chat and stays
+    there, while a code goes back in the pool after a month. A link carrying
+    a recycled code would open whichever bill holds that code now — someone
+    else's. The id is never reused, and it is hidden behind the link text
+    anyway, so nothing about the message changes.
+    """
     global _bot_username
     if _bot_username is None:
         try:
             _bot_username = (await bot.me()).username
         except Exception:
             return None
-    return f"https://t.me/{_bot_username}?startapp={code}"
+    return f"https://t.me/{_bot_username}?startapp={session_id}"
 
 
 def _parse_inline_query(raw: str) -> tuple[str, str]:
@@ -174,14 +182,25 @@ def _parse_inline_query(raw: str) -> tuple[str, str]:
 
 
 async def _find_session(db, token: str) -> SessionModel | None:
-    """Resolve an inline query's session token — the short join code, or a
-    uuid from a share button posted before codes were used."""
+    """Resolve an inline query's session token — a uuid, or a join code.
+
+    A uuid identifies one bill for good. A code only identifies one inside
+    the window it was allocated in (see routers/sessions.py): an old share
+    button pressed a year later finds nothing, rather than finding whichever
+    bill took that code since.
+    """
     try:
         return await db.get(SessionModel, uuid.UUID(token))
     except ValueError:
         pass
     result = await db.execute(
-        select(SessionModel).where(SessionModel.code == token.upper())
+        select(SessionModel)
+        .where(
+            SessionModel.code == token.strip(),
+            SessionModel.created_at > lookup_cutoff(),
+        )
+        .order_by(SessionModel.created_at.desc())
+        .limit(1)
     )
     return result.scalar_one_or_none()
 
@@ -231,7 +250,7 @@ async def handle_inline_query(query: InlineQuery):
     # The full breakdown lives behind the deep link, so the message itself
     # stays a short list of who owes what.
     lines = []
-    link = await _deep_link(session.code)
+    link = await _deep_link(session.id)
     if link:
         lines.append(f'🔎 <a href="{link}">{L["how"]}</a>')
         lines.append("")

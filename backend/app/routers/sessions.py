@@ -1,10 +1,9 @@
-import secrets
-import string
 import uuid
 from decimal import ROUND_HALF_UP, Decimal
 
 from app.calculator import unclaimed_items
 from app.db import get_db
+from app.joincode import lookup_cutoff, pick_free_code
 from app.models import Assignment, Item, Person
 from app.models import Session as SessionModel
 from app.schemas import (
@@ -21,25 +20,38 @@ from app.services.ratelimit import SlidingWindowLimiter
 from app.services.telegram_auth import TelegramUser, get_tg_user
 from app.ws import manager
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
-_CODE_ALPHABET = string.digits
-_CODE_LEN = 4
+
+# Allocation reads the taken codes and then inserts one, and the unique index
+# that used to make that pair atomic is gone — a code is only taken for a
+# while now, which no index can express. Two sessions created in the same
+# instant could otherwise pick the same code, and a guest typing it would
+# land in whichever bill the lookup preferred. This lock, held to the end of
+# the inserting transaction, puts the pair back together. Any constant works;
+# it just has to be the same one everywhere.
+_CODE_ALLOC_LOCK = 0x1B11C0DE
 
 
 def _generate_code(db: Session) -> str:
-    """Return a 4-digit numeric code that is not yet used by any session."""
-    for _ in range(50):
-        code = "".join(secrets.choice(_CODE_ALPHABET) for _ in range(_CODE_LEN))
-        exists = db.execute(
-            select(SessionModel.id).where(SessionModel.code == code)
-        ).first()
-        if not exists:
-            return code
-    raise HTTPException(500, "Could not allocate a session code")
+    """A join code no recent session is using. See app/joincode.py."""
+    db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _CODE_ALLOC_LOCK})
+    taken = set(
+        db.execute(
+            select(SessionModel.code).where(SessionModel.created_at > lookup_cutoff())
+        )
+        .scalars()
+        .all()
+    )
+    code = pick_free_code(taken)
+    if code is None:
+        raise HTTPException(
+            503, "Too many bills are open right now. Try again in a few minutes."
+        )
+    return code
 
 
 # A four-digit code is small enough to enumerate, and every session behind one
@@ -168,8 +180,17 @@ def get_session_by_code(
 ):
     if not _code_lookups.hit(user.id):
         raise HTTPException(429, "Too many code lookups. Try again in a minute.")
+    # Codes are reused, so a code alone only identifies a bill inside the
+    # window it was allocated in. Newest first: within the window a code is
+    # unique, and the ordering is what keeps that true if a clock skews.
     row = db.execute(
-        select(SessionModel).where(SessionModel.code == code.upper().strip())
+        select(SessionModel)
+        .where(
+            SessionModel.code == code.strip(),
+            SessionModel.created_at > lookup_cutoff(),
+        )
+        .order_by(SessionModel.created_at.desc())
+        .limit(1)
     ).scalar_one_or_none()
     if not row:
         raise HTTPException(404, "Session not found")

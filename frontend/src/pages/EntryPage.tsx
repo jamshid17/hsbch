@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api";
-import { getJoinCode } from "../telegram";
+import { getJoinToken } from "../telegram";
 import CardPayment from "../components/CardPayment";
 import PaywallSheet from "../components/PaywallSheet";
 import LanguageSwitcher from "../components/LanguageSwitcher";
@@ -24,10 +24,10 @@ export default function EntryPage() {
   const paid = !!me?.subscriptions_enabled;
   const locked = paid && !!me && !me.is_subscribed && me.scans_left === 0;
 
-  // Deep link (?join=CODE or Telegram startapp) → jump straight to join.
+  // Deep link (?join=<token> or Telegram startapp) → jump straight to join.
   useEffect(() => {
-    const code = getJoinCode();
-    if (code) navigate(`/join?code=${code}`, { replace: true });
+    const token = getJoinToken();
+    if (token) navigate(`/join?code=${encodeURIComponent(token)}`, { replace: true });
   }, [navigate]);
 
   const subUntil = me?.subscription_until

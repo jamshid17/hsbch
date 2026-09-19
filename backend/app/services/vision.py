@@ -55,7 +55,7 @@ async def scan_receipt(image_bytes: bytes, media_type: str) -> ScanResult:
 
     try:
         message = await anthropic_client.messages.create(
-            model="claude-sonnet-4-6",
+            model="claude-sonnet-5",
             max_tokens=8192,
             messages=[
                 {

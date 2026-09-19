@@ -67,12 +67,14 @@ export default function SummaryPage() {
         setSummary(sum);
         setBotUsername(config.bot_username);
         setCode(session.code);
-        // Same deep link as the invite — opening a finished session jumps
-        // straight to this summary (JoinPage routes `done` sessions here).
+        // Same deep link as the invite, and the session id for the same
+        // reason: this one is shared into a chat and read months later, long
+        // after the code has gone back in the pool. JoinPage routes a `done`
+        // session straight here.
         setShareLink(
           config.bot_username
-            ? `https://t.me/${config.bot_username}?startapp=${session.code}`
-            : `${window.location.origin}/?join=${session.code}`
+            ? `https://t.me/${config.bot_username}?startapp=${session.id}`
+            : `${window.location.origin}/?join=${session.id}`
         );
       })
       .catch((e: unknown) =>
