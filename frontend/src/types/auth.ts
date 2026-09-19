@@ -13,6 +13,9 @@ export interface AuthState {
   error: string | null;
   /** True when opened outside Telegram (plain browser) — show the landing page. */
   notInTelegram: boolean;
+  /** An admin has blocked this account. A dead end, not a failure to retry:
+   * `error` carries the reason, when one was given. */
+  isBlocked: boolean;
 }
 
 /** Auth context value: state plus a manual retry. */

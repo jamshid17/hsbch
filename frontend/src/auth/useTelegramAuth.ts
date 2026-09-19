@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "../api";
+import { api, ApiError } from "../api";
 import { tg, getInitData } from "../telegram";
 import type { AuthContextValue, AuthState } from "../types/auth";
 
@@ -9,6 +9,7 @@ const INITIAL: AuthState = {
   user: null,
   error: null,
   notInTelegram: false,
+  isBlocked: false,
 };
 
 /**
@@ -45,6 +46,7 @@ export function useTelegramAuth(): AuthContextValue {
           user: null,
           error: null,
           notInTelegram: true,
+          isBlocked: false,
         });
         return;
       }
@@ -56,6 +58,7 @@ export function useTelegramAuth(): AuthContextValue {
         user,
         error: null,
         notInTelegram: false,
+        isBlocked: false,
       });
     } catch (err) {
       setState({
@@ -64,6 +67,10 @@ export function useTelegramAuth(): AuthContextValue {
         user: null,
         error: err instanceof Error ? err.message : "Authentication failed",
         notInTelegram: false,
+        // 403 from the auth endpoint means one thing: an admin blocked this
+        // account. Retrying will not help, so the gate says so instead of
+        // offering the button.
+        isBlocked: err instanceof ApiError && err.status === 403,
       });
     }
   }, []);

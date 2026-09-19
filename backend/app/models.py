@@ -11,7 +11,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.sql import false, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -159,6 +159,19 @@ class BotUser(Base):
     is_admin: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
+    # What this admin may do beyond reading the overview (app/permissions.py).
+    # Empty for everyone who isn't one. The super admin's are implicit and
+    # this column is never consulted for them.
+    permissions: Mapped[list[str]] = mapped_column(
+        ARRAY(String(32)), nullable=False, default=list, server_default="{}"
+    )
+    # Set = blocked: the next API call this user makes is refused, and the
+    # bot stops answering them. Nothing of theirs is deleted, so unblocking
+    # gives back exactly what was there. Who did it and why are kept because
+    # the person who asks "why can't I get in" is rarely the one who knows.
+    blocked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    blocked_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    block_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
 
 class Payment(Base):

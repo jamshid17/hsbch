@@ -460,6 +460,13 @@ input:focus {
   border-bottom: none;
 }
 
+/* A grant the person editing doesn't hold. Shown, because seeing it is what
+   makes it legible as "not yours to give" rather than "doesn't exist". */
+.check-row-locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .check-row:focus-visible {
   outline: 2px solid var(--button);
   outline-offset: -2px;
@@ -1062,6 +1069,11 @@ input:focus {
   background: color-mix(in srgb, #5b6ee1 22%, transparent);
 }
 
+/* Shut out of the app. The loudest state a row can be in, so it reads first. */
+.badge-danger {
+  background: color-mix(in srgb, #e53935 22%, transparent);
+}
+
 /* The owner account. Distinct from a plain admin because it's the one row
    with no action button — the colour explains the absence. */
 .badge-super {
@@ -1071,8 +1083,13 @@ input:focus {
 .badge-ok,
 .badge-warn,
 .badge-admin,
-.badge-super {
+.badge-super,
+.badge-danger {
   color: var(--text);
+}
+
+.badge-danger::before {
+  background: #e53935;
 }
 
 .badge-ok::before {

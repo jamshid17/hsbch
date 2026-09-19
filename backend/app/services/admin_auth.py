@@ -9,11 +9,17 @@ the panel can never end up with nobody able to open it.
 The remaining ids in ADMIN_TELEGRAM_IDS are only a seed: the migration that
 introduced the column wrote them into the table, and from then on they are
 ordinary admins like anyone promoted from the panel.
+
+Being an admin buys the overview — the stats and the user list. Everything
+an admin can *do* is a named grant on top of that; see app/permissions.py.
 """
+
+from typing import Callable
 
 from app.config import settings
 from app.db import AsyncSessionLocal, get_db
 from app.models import BotUser
+from app.permissions import ALL_PERMISSIONS, Permission, clean
 from app.services.telegram_auth import TelegramUser, get_tg_user
 from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -54,13 +60,36 @@ def require_admin(
     return tg_user
 
 
-def require_super_admin(
-    tg_user: TelegramUser = Depends(get_tg_user),
-) -> TelegramUser:
-    """For the parts of the panel only the owner account may see: payments,
-    sessions, the raw tables, and handing out admin rights. Ordinary admins
-    get the overview tab and nothing else, so these answer 404 to them too —
-    same reasoning as require_admin."""
-    if not is_super_admin(tg_user.id):
-        raise HTTPException(404, "Not found")
-    return tg_user
+def permissions_of(db: Session, telegram_user_id: int) -> set[str]:
+    """What this person may do in the panel, beyond reading the overview.
+
+    The owner account holds everything by configuration and its column is
+    never read — that is the fixed point that keeps the panel usable however
+    the grants are edited. Nobody who isn't an admin holds anything, whatever
+    the column says: a demoted admin's old grants must not survive being
+    demoted.
+    """
+    if is_super_admin(telegram_user_id):
+        return set(ALL_PERMISSIONS)
+    user = db.get(BotUser, telegram_user_id)
+    if not user or not user.is_admin:
+        return set()
+    return set(clean(user.permissions))
+
+
+def require_permission(permission: Permission) -> Callable[..., TelegramUser]:
+    """Guard an endpoint behind one named grant.
+
+    404 rather than 403, like require_admin: the panel doesn't tell someone
+    what it is they're not allowed to reach.
+    """
+
+    def dependency(
+        db: Session = Depends(get_db),
+        tg_user: TelegramUser = Depends(get_tg_user),
+    ) -> TelegramUser:
+        if permission.value not in permissions_of(db, tg_user.id):
+            raise HTTPException(404, "Not found")
+        return tg_user
+
+    return dependency

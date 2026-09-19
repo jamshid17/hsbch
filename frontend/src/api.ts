@@ -122,9 +122,12 @@ export interface MeOut {
   free_total_scans: number;
   subscription_days: number;
   is_admin: boolean;
-  /** The owner account (first id in ADMIN_TELEGRAM_IDS). Ordinary admins only
-   * get the overview tab of the panel. */
+  /** The owner account (first id in ADMIN_TELEGRAM_IDS). Holds every
+   * permission below by configuration, and is never editable. */
   is_super_admin: boolean;
+  /** Which admin actions this account may take — see lib/permissions.ts.
+   * Empty for an admin who has only been given the overview. */
+  permissions: string[];
   card: {
     number: string;
     holder: string;
@@ -166,6 +169,14 @@ export interface AdminUser {
   /** The owner account (first id in ADMIN_TELEGRAM_IDS) — no other admin can
    * demote them. */
   is_super_admin: boolean;
+  /** Admin grants held. Every permission for the owner; empty for anyone who
+   * isn't an admin at all. */
+  permissions: string[];
+  /** Blocked: every API call of theirs is refused and the bot ignores them.
+   * Nothing of theirs is deleted, so unblocking is a plain undo. */
+  is_blocked: boolean;
+  blocked_at: string | null;
+  block_reason: string | null;
 }
 
 /** Enough of a bot_users row to label a payment or a session. */
@@ -260,6 +271,23 @@ export const api = {
   adminRevoke: (userId: number) =>
     request<{ is_subscribed: boolean }>(`/admin/users/${userId}/revoke`, {
       method: "POST",
+    }),
+
+  adminBlock: (userId: number, reason: string) =>
+    request<{ is_blocked: boolean; blocked_at: string; block_reason: string | null }>(
+      `/admin/users/${userId}/block`,
+      { method: "POST", body: JSON.stringify({ reason: reason || null }) },
+    ),
+
+  adminUnblock: (userId: number) =>
+    request<{ is_blocked: boolean }>(`/admin/users/${userId}/unblock`, {
+      method: "POST",
+    }),
+
+  adminSetPermissions: (userId: number, permissions: string[]) =>
+    request<{ permissions: string[] }>(`/admin/users/${userId}/permissions`, {
+      method: "POST",
+      body: JSON.stringify({ permissions }),
     }),
 
   adminSetAdmin: (userId: number, isAdmin: boolean) =>

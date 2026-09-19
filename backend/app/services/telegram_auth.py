@@ -13,9 +13,12 @@ from urllib.parse import parse_qsl, unquote, unquote_plus
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-from fastapi import Header, HTTPException
+from fastapi import Depends, Header, HTTPException
 
 from app.config import settings
+from app.db import get_db
+from app.models import BotUser
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger("telegram_auth")
 
@@ -186,7 +189,27 @@ def _user_from_fields(pairs: dict) -> TelegramUser:
     )
 
 
+BLOCKED_MESSAGE = "Hisobingiz bloklangan."
+
+
+def _reject_if_blocked(db: Session, user: TelegramUser) -> TelegramUser:
+    """Blocked means blocked everywhere.
+
+    Every authenticated endpoint resolves the caller through this dependency,
+    so checking here is what makes the block total — rather than a list of
+    routes someone has to remember to add the next one to.
+    """
+    row = db.get(BotUser, user.id)
+    if row is not None and row.blocked_at is not None:
+        detail = BLOCKED_MESSAGE
+        if row.block_reason:
+            detail = f"{detail} Sabab: {row.block_reason}"
+        raise HTTPException(403, detail)
+    return user
+
+
 def get_tg_user(
+    db: Session = Depends(get_db),
     x_telegram_init_data: str | None = Header(default=None),
     x_telegram_user_id: str | None = Header(default=None),
     x_telegram_user_name: str | None = Header(default=None),
@@ -195,16 +218,22 @@ def get_tg_user(
 
     Primary path validates the signed initData header. When DEV_ALLOW_UNSAFE is
     on (local/browser testing) and no initData is present, an unsigned
-    X-Telegram-User-Id header is accepted instead.
+    X-Telegram-User-Id header is accepted instead. Either way a blocked user
+    gets no further than here.
     """
     if x_telegram_init_data:
-        return _user_from_fields(_verify_init_data(x_telegram_init_data))
+        return _reject_if_blocked(
+            db, _user_from_fields(_verify_init_data(x_telegram_init_data))
+        )
 
     if settings.dev_allow_unsafe and x_telegram_user_id:
-        return TelegramUser(
-            id=int(x_telegram_user_id),
-            first_name=x_telegram_user_name or f"User {x_telegram_user_id}",
-            username=None,
+        return _reject_if_blocked(
+            db,
+            TelegramUser(
+                id=int(x_telegram_user_id),
+                first_name=x_telegram_user_name or f"User {x_telegram_user_id}",
+                username=None,
+            ),
         )
 
     raise HTTPException(401, "Telegram authentication required")

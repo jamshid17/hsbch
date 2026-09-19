@@ -9,6 +9,9 @@ import AddAdminForm from "../components/AddAdminForm";
 import AdminPayments from "../components/AdminPayments";
 import AdminSessions from "../components/AdminSessions";
 import AdminTables from "../components/AdminTables";
+import BlockSheet from "../components/BlockSheet";
+import PermissionsSheet from "../components/PermissionsSheet";
+import { can, permissionLabel } from "../lib/permissions";
 import { fmtDate, fmtDateTime, fmtNum, relDate } from "../lib/format";
 
 const FILTERS = [
@@ -20,14 +23,14 @@ const FILTERS = [
   { key: "exhausted", label: "Limiti tugagan", paidOnly: true },
 ] as const;
 
-// Everything past the overview is the owner account's alone — the backend
-// answers 404 to an ordinary admin on those endpoints, so hiding the tabs is
-// the honest thing to show rather than the lock itself.
+// Each tab past the overview needs its own grant. The backend answers 404 on
+// those endpoints without it, so hiding the tab shows the same truth rather
+// than a lock the person can press.
 const TABS = [
   { key: "overview", label: "📊 Umumiy" },
-  { key: "payments", label: "💳 To'lovlar", superOnly: true },
-  { key: "sessions", label: "🧾 Sessiyalar", superOnly: true },
-  { key: "tables", label: "🗄 Baza", superOnly: true },
+  { key: "payments", label: "💳 To'lovlar", needs: "payments" },
+  { key: "sessions", label: "🧾 Sessiyalar", needs: "sessions" },
+  { key: "tables", label: "🗄 Baza", needs: "tables" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -50,18 +53,27 @@ function StatTile({
   );
 }
 
-type PendingAction = "grant" | "extend" | "revoke" | "promote" | "demote";
+type PendingAction =
+  | "grant"
+  | "extend"
+  | "revoke"
+  | "promote"
+  | "demote"
+  | "block"
+  | "unblock"
+  | "permissions";
 
 function UserRow({
   user,
   paid,
   meId,
-  canManageAdmins,
+  myPermissions,
 }: {
   user: AdminUser;
   paid: boolean;
   meId?: number;
-  canManageAdmins: boolean;
+  /** What the admin looking at this row holds. */
+  myPermissions: string[];
 }) {
   const queryClient = useQueryClient();
   // Every write goes through a confirmation sheet — these rows sit close
@@ -71,10 +83,13 @@ function UserRow({
   // a list of 50 users shouldn't fire 50 requests nobody asked for.
   const [showPayments, setShowPayments] = useState(false);
 
+  const holds = (key: Parameters<typeof can>[1]) =>
+    myPermissions.includes(key);
+
   const payments = useQuery({
     queryKey: ["admin", "user-payments", user.telegram_user_id],
     queryFn: () => api.adminUserPayments(user.telegram_user_id),
-    enabled: showPayments,
+    enabled: showPayments && holds("payments"),
   });
 
   const invalidate = () => {
@@ -106,14 +121,44 @@ function UserRow({
       queryClient.invalidateQueries({ queryKey: ["me"] });
     },
   });
+  const setPermissions = useMutation({
+    mutationFn: (permissions: string[]) =>
+      api.adminSetPermissions(user.telegram_user_id, permissions),
+    onSuccess: () => {
+      setPending(null);
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+    },
+  });
+  const block = useMutation({
+    mutationFn: (reason: string) =>
+      api.adminBlock(user.telegram_user_id, reason),
+    onSuccess: () => {
+      setPending(null);
+      invalidate();
+    },
+  });
+  const unblock = useMutation({
+    mutationFn: () => api.adminUnblock(user.telegram_user_id),
+    onSuccess: () => {
+      setPending(null);
+      invalidate();
+    },
+  });
 
-  // Only the super admin hands out admin rights. On top of that: the super
-  // admin is the owner account and has no in-app toggle at all, and nobody
-  // can demote themselves out of the screen they're standing on.
+  // Managing admins is its own grant. On top of it: the owner account has no
+  // in-app toggle at all, and nobody can demote themselves out of the screen
+  // they're standing on.
+  const isSelf = user.telegram_user_id === meId;
   const canToggleAdmin =
-    canManageAdmins &&
+    holds("manage_admins") && !user.is_super_admin && !(user.is_admin && isSelf);
+  // Same two exceptions, and one more: an admin is only blockable by someone
+  // who could have demoted them — the backend refuses otherwise.
+  const canBlock =
+    holds("block_users") &&
     !user.is_super_admin &&
-    !(user.is_admin && user.telegram_user_id === meId);
+    !isSelf &&
+    (!user.is_admin || holds("manage_admins"));
 
   const name =
     user.first_name || (user.username ? `@${user.username}` : "Noma'lum");
@@ -135,6 +180,7 @@ function UserRow({
               {user.is_super_admin ? "asosiy admin" : "admin"}
             </span>
           )}
+          {user.is_blocked && <span className="badge badge-danger">bloklangan</span>}
           {paid && user.is_subscribed && (
             <span className="badge badge-ok">obuna</span>
           )}
@@ -157,13 +203,33 @@ function UserRow({
           {paid && user.is_subscribed && until ? ` · ${until} gacha` : ""}
         </div>
 
-        <button
-          className="link-toggle"
-          onClick={() => setShowPayments((v) => !v)}
-          aria-expanded={showPayments}
-        >
-          To'lovlar tarixi {showPayments ? "▴" : "▾"}
-        </button>
+        {user.is_blocked && (
+          <div className="user-meta">
+            🚫 Bloklangan{user.blocked_at ? ` · ${fmtDate(user.blocked_at)}` : ""}
+            {user.block_reason ? ` · ${user.block_reason}` : ""}
+          </div>
+        )}
+
+        {/* What an admin may do, spelled out — otherwise the only way to
+            know is to open the editor one row at a time. */}
+        {user.is_admin && !user.is_super_admin && (
+          <div className="user-meta">
+            🔑{" "}
+            {user.permissions.length
+              ? user.permissions.map(permissionLabel).join(", ")
+              : "faqat umumiy ko'rish"}
+          </div>
+        )}
+
+        {holds("payments") && (
+          <button
+            className="link-toggle"
+            onClick={() => setShowPayments((v) => !v)}
+            aria-expanded={showPayments}
+          >
+            To'lovlar tarixi {showPayments ? "▴" : "▾"}
+          </button>
+        )}
 
         {showPayments && (
           <div className="user-payments">
@@ -186,6 +252,7 @@ function UserRow({
 
       <div className="user-actions">
         {paid &&
+          holds("subscriptions") &&
           (user.is_subscribed ? (
             <>
               <button className="btn-mini" onClick={() => setPending("extend")}>
@@ -220,6 +287,29 @@ function UserRow({
               🛠 Admin qilish
             </button>
           ))}
+
+        {holds("manage_admins") && user.is_admin && !user.is_super_admin && (
+          <button className="btn-mini" onClick={() => setPending("permissions")}>
+            🔑 Huquqlar
+          </button>
+        )}
+
+        {canBlock &&
+          (user.is_blocked ? (
+            <button
+              className="btn-mini btn-mini-primary"
+              onClick={() => setPending("unblock")}
+            >
+              Blokdan chiqarish
+            </button>
+          ) : (
+            <button
+              className="btn-mini btn-mini-danger"
+              onClick={() => setPending("block")}
+            >
+              🚫 Bloklash
+            </button>
+          ))}
       </div>
 
       {pending === "grant" && (
@@ -249,7 +339,7 @@ function UserRow({
       {pending === "promote" && (
         <ConfirmSheet
           title="Admin qilish"
-          body={`${name} (${user.telegram_user_id}) admin panelning "Umumiy" tabini ochadi: statistika, barcha foydalanuvchilar va obunalarni boshqarish. To'lovlar, sessiyalar, baza va adminlarni boshqarish faqat sizda qoladi. Shu odamga ishonasizmi?`}
+          body={`${name} (${user.telegram_user_id}) admin panelning "Umumiy" tabini ochadi: statistika va foydalanuvchilar ro'yxati — ko'rish uchun. Obuna berish, bloklash, to'lovlar va boshqalar uchun keyin "🔑 Huquqlar" dan alohida ruxsat berasiz.`}
           confirmLabel="Ha, admin qilish"
           busy={setAdmin.isPending}
           onConfirm={() => setAdmin.mutate(true)}
@@ -260,7 +350,7 @@ function UserRow({
       {pending === "demote" && (
         <ConfirmSheet
           title="Adminlikdan olish"
-          body={`${name} ning admin huquqlari darhol olib tashlanadi va u admin panelni boshqa ocholmaydi.`}
+          body={`${name} ning admin huquqlari darhol olib tashlanadi va u admin panelni boshqa ocholmaydi. Berilgan huquqlar ham tozalanadi — keyin qayta admin qilsangiz, ularni yana berishingiz kerak.`}
           confirmLabel="Ha, olib tashlash"
           danger
           busy={setAdmin.isPending}
@@ -269,8 +359,50 @@ function UserRow({
         />
       )}
 
+      {pending === "permissions" && (
+        <PermissionsSheet
+          name={name}
+          current={user.permissions}
+          mine={myPermissions}
+          busy={setPermissions.isPending}
+          error={
+            setPermissions.isError
+              ? (setPermissions.error as Error).message
+              : undefined
+          }
+          onSave={(perms) => setPermissions.mutate(perms)}
+          onCancel={() => setPending(null)}
+        />
+      )}
+
+      {pending === "block" && (
+        <BlockSheet
+          name={name}
+          userId={user.telegram_user_id}
+          busy={block.isPending}
+          error={block.isError ? (block.error as Error).message : undefined}
+          onConfirm={(reason) => block.mutate(reason)}
+          onCancel={() => setPending(null)}
+        />
+      )}
+
+      {pending === "unblock" && (
+        <ConfirmSheet
+          title="Blokdan chiqarish"
+          body={`${name} yana ilovadan va botdan foydalana oladi. Hammasi bloklashdan oldingi holida.`}
+          confirmLabel="Ha, chiqarish"
+          busy={unblock.isPending}
+          onConfirm={() => unblock.mutate()}
+          onCancel={() => setPending(null)}
+        />
+      )}
+
       {setAdmin.isError && (
         <p className="error">{(setAdmin.error as Error).message}</p>
+      )}
+
+      {unblock.isError && (
+        <p className="error">{(unblock.error as Error).message}</p>
       )}
 
       {pending === "revoke" && (
@@ -302,10 +434,12 @@ export default function AdminPage() {
 
   // Subscription stats, filters and row actions all hang off this one flag.
   const paid = !!me?.subscriptions_enabled;
-  // An ordinary admin sees the overview and nothing else: no payments,
-  // sessions or tables, and no way to promote anyone.
-  const isSuper = !!me?.is_super_admin;
-  const tabs = TABS.filter((t) => isSuper || !("superOnly" in t && t.superOnly));
+  // Everything an admin may do beyond reading the overview. The owner holds
+  // all of them; an admin holds whatever they were granted.
+  const myPermissions = me?.permissions ?? [];
+  const tabs = TABS.filter(
+    (t) => !("needs" in t) || myPermissions.includes(t.needs),
+  );
   const activeTab = tabs.some((t) => t.key === tab) ? tab : "overview";
   const filters = FILTERS.filter(
     (f) => paid || !("paidOnly" in f && f.paidOnly),
@@ -415,7 +549,7 @@ export default function AdminPage() {
 
           {stats && <DailyScansChart data={stats.daily_scans} />}
 
-          {isSuper && (
+          {can(me, "manage_admins") && (
             <>
               <h2 className="section-title">Adminlar</h2>
               <AddAdminForm />
@@ -458,7 +592,7 @@ export default function AdminPage() {
                   user={u}
                   paid={paid}
                   meId={me?.telegram_user_id}
-                  canManageAdmins={isSuper}
+                  myPermissions={myPermissions}
                 />
               ))}
               {users.users.length < users.total && (

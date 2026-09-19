@@ -24,12 +24,33 @@ from app.calculator import calculate_summary
 from app.config import settings
 from app.db import AsyncSessionLocal
 from app.joincode import lookup_cutoff
-from app.models import Assignment, Item, Person
+from app.models import Assignment, BotUser, Item, Person
 from app.models import Session as SessionModel
 
 bot = Bot(token=settings.bot_token)
 dp = Dispatcher()
 router = Router()
+
+
+@dp.update.outer_middleware()
+async def drop_blocked_users(handler, event, data):
+    """A blocked user gets no answer from the bot either.
+
+    Outer middleware, so it runs before any router or filter and covers every
+    update type at once — the alternative is remembering to check inside each
+    handler, and the one that gets forgotten is the whole hole. Silence rather
+    than a refusal: there is nothing for them to do about it here, and a bot
+    that argues invites arguing back.
+    """
+    user = data.get("event_from_user")
+    if user is not None:
+        async with AsyncSessionLocal() as db:
+            row = await db.get(BotUser, user.id)
+            if row is not None and row.blocked_at is not None:
+                return None
+    return await handler(event, data)
+
+
 dp.include_router(router)
 # Admin-only screens over the database. Its own router-level filter drops
 # everyone else's updates, so ordering against the public handlers is safe.
@@ -52,9 +73,11 @@ async def cmd_start(message: Message, command: CommandObject):
 
     raw_arg = (command.args or "").strip()
 
-    # Deep link: /start <CODE> (from t.me/<bot>?start=<CODE>) opens the Mini App
-    # straight into the join screen for that session.
-    code = raw_arg.upper()
+    # Deep link: /start <token> (from t.me/<bot>?start=<token>) opens the Mini
+    # App straight into the join screen. The token is a join code or a session
+    # id — and upper-casing it, as this did, mangles neither but means nothing
+    # either, now that codes are digits.
+    code = raw_arg
     if code:
         sep = "&" if "?" in settings.webapp_url else "?"
         join_url = f"{settings.webapp_url}{sep}join={code}"

@@ -5,10 +5,12 @@ from app.config import settings
 from app.db import get_db
 from app.models import Assignment, BotUser, Item, Payment, Person, ReceiptScan
 from app.models import Session as SessionModel
+from app.permissions import ALL_PERMISSIONS, Permission, clean
 from app.services.admin_auth import (
     is_super_admin,
+    permissions_of,
     require_admin,
-    require_super_admin,
+    require_permission,
 )
 from app.services.telegram_auth import TelegramUser
 from app.timeutil import day_start_utc as _day_start_utc
@@ -204,6 +206,16 @@ def list_users(
                 "is_admin": bool(u.is_admin) or is_super_admin(u.telegram_user_id),
                 # The owner account — shown differently and never demotable.
                 "is_super_admin": is_super_admin(u.telegram_user_id),
+                # Everything for the owner, whatever the column happens to
+                # hold; nothing for anyone who isn't an admin.
+                "permissions": (
+                    sorted(ALL_PERMISSIONS)
+                    if is_super_admin(u.telegram_user_id)
+                    else clean(u.permissions) if u.is_admin else []
+                ),
+                "is_blocked": u.blocked_at is not None,
+                "blocked_at": u.blocked_at.isoformat() if u.blocked_at else None,
+                "block_reason": u.block_reason,
             }
             for u in users
         ],
@@ -223,7 +235,7 @@ def _user_brief(user: BotUser | None, telegram_user_id: int) -> dict:
 @router.get("/payments")
 def list_payments(
     db: Session = Depends(get_db),
-    _: TelegramUser = Depends(require_super_admin),
+    _: TelegramUser = Depends(require_permission(Permission.PAYMENTS)),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):
@@ -266,7 +278,7 @@ def list_payments(
 @router.get("/sessions")
 def list_sessions(
     db: Session = Depends(get_db),
-    _: TelegramUser = Depends(require_super_admin),
+    _: TelegramUser = Depends(require_permission(Permission.SESSIONS)),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):
@@ -314,7 +326,7 @@ def list_sessions(
 @router.get("/tables")
 def list_tables(
     db: Session = Depends(get_db),
-    _: TelegramUser = Depends(require_super_admin),
+    _: TelegramUser = Depends(require_permission(Permission.TABLES)),
 ):
     """Row counts per table, plus how much disk the whole thing takes — the
     "is anything actually in there" view you'd otherwise open psql for."""
@@ -357,7 +369,7 @@ def grant_subscription(
     telegram_user_id: int,
     body: GrantIn,
     db: Session = Depends(get_db),
-    admin: TelegramUser = Depends(require_admin),
+    admin: TelegramUser = Depends(require_permission(Permission.SUBSCRIPTIONS)),
 ):
     """Turn a card transfer into a subscription. Extends an active
     subscription rather than overwriting it, so paying twice adds up."""
@@ -402,7 +414,7 @@ def grant_subscription(
 def revoke_subscription(
     telegram_user_id: int,
     db: Session = Depends(get_db),
-    _: TelegramUser = Depends(require_admin),
+    _: TelegramUser = Depends(require_permission(Permission.SUBSCRIPTIONS)),
 ):
     user = db.get(BotUser, telegram_user_id)
     if user is None:
@@ -416,7 +428,7 @@ def revoke_subscription(
 def user_payments(
     telegram_user_id: int,
     db: Session = Depends(get_db),
-    _: TelegramUser = Depends(require_admin),
+    _: TelegramUser = Depends(require_permission(Permission.PAYMENTS)),
 ):
     rows = (
         db.execute(
@@ -442,6 +454,144 @@ def user_payments(
     ]
 
 
+class BlockIn(BaseModel):
+    reason: str | None = Field(default=None, max_length=200)
+
+
+def _target(db: Session, telegram_user_id: int) -> BotUser:
+    user = db.get(BotUser, telegram_user_id)
+    if user is None:
+        raise HTTPException(404, "Foydalanuvchi topilmadi")
+    return user
+
+
+def _refuse_if_protected(
+    db: Session, admin: TelegramUser, telegram_user_id: int, action: str
+) -> None:
+    """The two people nobody may lock out, and the one rule above that.
+
+    The owner account is the guarantee that someone can always get into the
+    panel; blocking it would throw that away as thoroughly as demoting it.
+    Blocking yourself locks you out of the screen you are standing on. And an
+    admin is only blockable by someone who could have demoted them anyway —
+    otherwise the weaker grant quietly does the stronger one's job.
+    """
+    if is_super_admin(telegram_user_id):
+        raise HTTPException(400, f"Asosiy adminni {action} mumkin emas.")
+    if telegram_user_id == admin.id:
+        raise HTTPException(400, f"O'zingizni {action} mumkin emas.")
+    target = db.get(BotUser, telegram_user_id)
+    if (
+        target is not None
+        and target.is_admin
+        and Permission.MANAGE_ADMINS.value not in permissions_of(db, admin.id)
+    ):
+        raise HTTPException(403, f"Adminni {action} uchun huquqingiz yo'q.")
+
+
+@router.post("/users/{telegram_user_id}/block")
+def block_user(
+    telegram_user_id: int,
+    body: BlockIn,
+    db: Session = Depends(get_db),
+    admin: TelegramUser = Depends(require_permission(Permission.BLOCK_USERS)),
+):
+    """Shut someone out of the app and the bot.
+
+    Nothing of theirs is touched — their bills, their picks and their
+    subscription all stay exactly where they were, so unblocking is a plain
+    undo rather than a restore.
+    """
+    _refuse_if_protected(db, admin, telegram_user_id, "bloklash")
+    user = _target(db, telegram_user_id)
+
+    if user.blocked_at is None:
+        user.blocked_at = datetime.utcnow()
+        user.blocked_by = admin.id
+    # A reason given on a re-block replaces the old one; the timestamp stays
+    # the first one, which is the answer to "since when".
+    user.block_reason = (body.reason or "").strip() or None
+    db.commit()
+    logger.info(
+        "admin %s blocked %s (%s)", admin.id, telegram_user_id, user.block_reason
+    )
+    return {
+        "telegram_user_id": telegram_user_id,
+        "is_blocked": True,
+        "blocked_at": user.blocked_at.isoformat(),
+        "block_reason": user.block_reason,
+    }
+
+
+@router.post("/users/{telegram_user_id}/unblock")
+def unblock_user(
+    telegram_user_id: int,
+    db: Session = Depends(get_db),
+    admin: TelegramUser = Depends(require_permission(Permission.BLOCK_USERS)),
+):
+    user = _target(db, telegram_user_id)
+    user.blocked_at = None
+    user.blocked_by = None
+    user.block_reason = None
+    db.commit()
+    logger.info("admin %s unblocked %s", admin.id, telegram_user_id)
+    return {"telegram_user_id": telegram_user_id, "is_blocked": False}
+
+
+class PermissionsIn(BaseModel):
+    permissions: list[str]
+
+
+@router.post("/users/{telegram_user_id}/permissions")
+def set_permissions(
+    telegram_user_id: int,
+    body: PermissionsIn,
+    db: Session = Depends(get_db),
+    admin: TelegramUser = Depends(require_permission(Permission.MANAGE_ADMINS)),
+):
+    """Replace what an admin may do (app/permissions.py).
+
+    Two rules hold it together. The owner account's rights are implicit, so
+    there is nothing here to edit and editing it would only create a column
+    that disagrees with the code. And nobody can grant what they don't hold
+    themselves — otherwise MANAGE_ADMINS alone would be every permission,
+    reachable by promoting a second account and granting it everything.
+    """
+    unknown = sorted(set(body.permissions) - ALL_PERMISSIONS)
+    if unknown:
+        raise HTTPException(400, f"Noma'lum huquq: {', '.join(unknown)}")
+
+    if is_super_admin(telegram_user_id):
+        raise HTTPException(
+            400, "Asosiy adminda barcha huquqlar doimiy — o'zgartirib bo'lmaydi."
+        )
+
+    user = _target(db, telegram_user_id)
+    if not user.is_admin:
+        raise HTTPException(400, "Avval foydalanuvchini admin qiling.")
+
+    mine = permissions_of(db, admin.id)
+    granting = set(body.permissions) - set(clean(user.permissions))
+    beyond = sorted(granting - mine)
+    if beyond:
+        raise HTTPException(
+            403, f"O'zingizda yo'q huquqni bera olmaysiz: {', '.join(beyond)}"
+        )
+
+    user.permissions = clean(body.permissions)
+    db.commit()
+    logger.info(
+        "admin %s set permissions %s for %s",
+        admin.id,
+        user.permissions,
+        telegram_user_id,
+    )
+    return {
+        "telegram_user_id": telegram_user_id,
+        "permissions": user.permissions,
+    }
+
+
 class AdminFlagIn(BaseModel):
     is_admin: bool
 
@@ -451,14 +601,14 @@ def set_admin(
     telegram_user_id: int,
     body: AdminFlagIn,
     db: Session = Depends(get_db),
-    admin: TelegramUser = Depends(require_super_admin),
+    admin: TelegramUser = Depends(require_permission(Permission.MANAGE_ADMINS)),
 ):
     """Promote someone to admin, or take it away — the whole point being that
     this no longer needs an .env edit and a redeploy.
 
-    Only the super admin may call it: ordinary admins see the overview tab and
-    can't hand out the rights they were given. And even for the owner two
-    things are refused outright, both to keep the panel reachable: the super
+    Behind the MANAGE_ADMINS grant, which the owner holds implicitly and can
+    hand on. Two things are refused outright whoever asks, both to keep the
+    panel reachable: the super
     admin can't be demoted by anyone, themselves included — they are the
     guarantee that someone can always get in; and nobody can demote
     themselves, which is the one mistake that locks the current session out of
@@ -487,6 +637,10 @@ def set_admin(
         db.add(user)
 
     user.is_admin = body.is_admin
+    if not body.is_admin:
+        # Otherwise promoting them again later would silently hand back
+        # everything they had the first time.
+        user.permissions = []
     db.commit()
     logger.info(
         "admin %s set is_admin=%s for %s", admin.id, body.is_admin, telegram_user_id

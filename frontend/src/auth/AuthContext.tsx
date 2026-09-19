@@ -53,6 +53,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  // Blocked is a dead end, not a failure: a retry button here would only
+  // invite pressing it, and the reason is the whole message.
+  if (auth.isBlocked) {
+    return (
+      <GateScreen>
+        <div style={{ fontSize: 40 }}>🚫</div>
+        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.5 }}>{auth.error}</p>
+      </GateScreen>
+    );
+  }
+
   if (!auth.isAuthenticated) {
     return (
       <GateScreen>
