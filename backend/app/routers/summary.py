@@ -101,9 +101,11 @@ async def send_summary_image(
             [
                 InlineKeyboardButton(
                     text=f"📤 {share_label[:48]}",
-                    # The bot composes the shared message and can't read
-                    # the app's language setting, so it rides along here.
-                    switch_inline_query=f"{session_id}|{lang[:8]}",
+                    # Lands in the user's input field while they pick a
+                    # chat, so it's the short join code, not the uuid. The
+                    # language rides along — the bot composes the shared
+                    # message and can't see the app's own setting.
+                    switch_inline_query=f"{session.code} {lang[:8]}".strip(),
                 )
             ]
         ]

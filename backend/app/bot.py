@@ -156,29 +156,42 @@ async def _deep_link(code: str) -> str | None:
     return f"https://t.me/{_bot_username}?startapp={code}"
 
 
+async def _find_session(db, token: str) -> SessionModel | None:
+    """Resolve an inline query's first word to a session — the short join
+    code, or a uuid from a share button posted before codes were used."""
+    try:
+        return await db.get(SessionModel, uuid.UUID(token))
+    except ValueError:
+        pass
+    result = await db.execute(
+        select(SessionModel).where(SessionModel.code == token.upper())
+    )
+    return result.scalar_one_or_none()
+
+
 @router.inline_query()
 async def handle_inline_query(query: InlineQuery):
-    # "<session uuid>" or "<session uuid>|<language>" — the Mini App appends
-    # the language it is being read in, which the bot has no other way to know.
-    raw, _, lang = query.query.strip().partition("|")
+    # "<join code> <language>", e.g. "0729 uz". The query sits in the user's
+    # input field while they pick a chat, so it's the short code people
+    # already know rather than the session's uuid. The language rides along
+    # because the bot composes the message and can't see the Mini App's own
+    # setting. Older buttons still in chats send a uuid, sometimes with a
+    # "|" separator — both are still accepted.
+    raw, _, lang = query.query.strip().replace("|", " ").partition(" ")
 
     if not raw:
-        await query.answer([], cache_time=1)
-        return
-
-    try:
-        session_id = uuid.UUID(raw)
-    except ValueError:
         await query.answer([], cache_time=1)
         return
 
     L = _labels(lang.strip().lower(), query.from_user.language_code)
 
     async with AsyncSessionLocal() as db:
-        session = await db.get(SessionModel, session_id)
+        session = await _find_session(db, raw)
         if not session or session.status != "done":
             await query.answer([], cache_time=1)
             return
+
+        session_id = session.id
 
         items_r = await db.execute(select(Item).where(Item.session_id == session_id))
         items = items_r.scalars().all()

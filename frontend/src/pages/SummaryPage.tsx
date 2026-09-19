@@ -34,6 +34,7 @@ export default function SummaryPage() {
 
   const [summary, setSummary] = useState<SummaryOut | null>(null);
   const [shareLink, setShareLink] = useState("");
+  const [code, setCode] = useState("");
   const [botUsername, setBotUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -49,6 +50,7 @@ export default function SummaryPage() {
       .then(([sum, session, config]) => {
         setSummary(sum);
         setBotUsername(config.bot_username);
+        setCode(session.code);
         // Same deep link as the invite — opening a finished session jumps
         // straight to this summary (JoinPage routes `done` sessions here).
         setShareLink(
@@ -75,13 +77,15 @@ export default function SummaryPage() {
     );
     const text = `🧾 ${t("summary.title")}\n${lines.join("\n")}`;
 
-    if (tg.initData) {
+    if (tg.initData && code) {
       // Inline mode, so the bot composes the message: the share dialog can
       // only send plain text, which leaves the deep link sitting there raw,
       // while the bot can hide it behind "see how it was calculated".
       // The language rides along — the bot can't read the app's own setting.
       try {
-        tg.switchInlineQuery(`${sessionId}|${i18n.language}`, [
+        // The query shows in the input field while a chat is picked, so it's
+        // the short join code people already know, not the session's uuid.
+        tg.switchInlineQuery(`${code} ${i18n.language}`.trim(), [
           "users",
           "groups",
           "channels",
