@@ -125,6 +125,24 @@ export default {
     finalizing: "Finalizing…",
     waiting: "Waiting for people to join…",
   },
+  // Items nobody picked. Their cost is charged to no one, so the split comes
+  // out smaller than the receipt unless the host does something about it.
+  unclaimed: {
+    notice: "⚠️ Nobody picked {{count}} item — {{amount}} is in no one's total.",
+    notice_other:
+        "⚠️ Nobody picked {{count}} items — {{amount}} is in no one's total.",
+    title: "{{count}} item nobody picked",
+    title_other: "{{count}} items nobody picked",
+    body:
+        "Their {{amount}} is in no one's total. Finish like this and the split comes out smaller than the receipt.",
+    splitEvenly: "Split evenly between everyone",
+    ignore: "Finish anyway",
+    back: "Go back and pick",
+    summaryNote:
+        "ℹ️ {{count}} item ({{amount}}) went to nobody and is not in the total.",
+    summaryNote_other:
+        "ℹ️ {{count}} items ({{amount}}) went to nobody and are not in the total.",
+  },
   summary: {
     title: "Who owes what",
     taxTip: "Tax + tip share",

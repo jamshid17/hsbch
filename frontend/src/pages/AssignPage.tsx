@@ -4,8 +4,9 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
-import { api, ItemOut, PersonOut } from "../api";
+import { api, ItemOut, PersonOut, UnclaimedItem } from "../api";
 import Skeleton from "../components/Skeleton";
+import UnclaimedSheet from "../components/UnclaimedSheet";
 import { fmtQty, MAX_QTY } from "../lib/format";
 import { storage } from "../lib/storage";
 
@@ -29,6 +30,7 @@ export default function AssignPage() {
   const [initialized, setInitialized] = useState(false);
   const [activeItem, setActiveItem] = useState<ItemOut | null>(null);
   const [error, setError] = useState("");
+  const [askUnclaimed, setAskUnclaimed] = useState(false);
 
   const { data: session } = useQuery({
     queryKey: ["session", sessionId],
@@ -80,13 +82,13 @@ export default function AssignPage() {
   }, [sel, people, initialized, sessionId]);
 
   const saveMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: (splitUnclaimed: boolean) => {
       const assignments = Object.entries(sel).flatMap(([item_id, byPerson]) =>
         Object.entries(byPerson)
           .filter(([, qty]) => qty > 0)
           .map(([person_id, qty]) => ({ item_id, person_id, quantity: String(qty) }))
       );
-      return api.setHostAssignments(sessionId!, assignments);
+      return api.setHostAssignments(sessionId!, assignments, splitUnclaimed);
     },
     onSuccess: () => {
       storage.clearAssignments(sessionId!);
@@ -117,6 +119,22 @@ export default function AssignPage() {
 
   function assignedCount(itemId: string) {
     return Object.keys(sel[itemId] || {}).length;
+  }
+
+  // Nobody is charged for an item left unassigned, so its price would simply
+  // leave the bill. Collect those before calculating, to ask about them.
+  const unclaimed: UnclaimedItem[] = (items ?? [])
+    .filter((item) => assignedCount(item.id) === 0)
+    .map((item) => ({
+      item_id: item.id,
+      name: item.name,
+      amount: String(parseFloat(item.price) * parseFloat(item.quantity)),
+    }));
+  const unclaimedTotal = unclaimed.reduce((s, u) => s + parseFloat(u.amount), 0);
+
+  function handleCalculate() {
+    if (unclaimed.length > 0) setAskUnclaimed(true);
+    else saveMutation.mutate(false);
   }
 
   const cur = session?.currency || "";
@@ -177,13 +195,34 @@ export default function AssignPage() {
 
       {error && <p className="error">{error}</p>}
 
+      {unclaimed.length > 0 && (
+        <p className="notice notice-warn">
+          {t("unclaimed.notice", {
+            count: unclaimed.length,
+            amount: `${fmt(unclaimedTotal)} ${cur}`.trim(),
+          })}
+        </p>
+      )}
+
       <button
         className="btn"
         disabled={saveMutation.isPending || !people || people.length === 0}
-        onClick={() => saveMutation.mutate()}
+        onClick={handleCalculate}
       >
         {saveMutation.isPending ? t("assign.calculating") : t("assign.calculate")}
       </button>
+
+      {askUnclaimed && (
+        <UnclaimedSheet
+          items={unclaimed}
+          total={String(unclaimedTotal)}
+          currency={cur}
+          busy={saveMutation.isPending}
+          onSplitEvenly={() => saveMutation.mutate(true)}
+          onIgnore={() => saveMutation.mutate(false)}
+          onCancel={() => setAskUnclaimed(false)}
+        />
+      )}
 
       <AnimatePresence>
         {activeItem && (

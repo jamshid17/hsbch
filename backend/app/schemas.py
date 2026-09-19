@@ -113,6 +113,13 @@ class HostAssignmentEntry(BaseModel):
 
 class HostAssignmentsUpdate(BaseModel):
     assignments: list[HostAssignmentEntry]
+    # Hand anything left unassigned to everyone in equal parts instead of
+    # letting its cost drop out of the split.
+    split_unclaimed: bool = False
+
+
+class FinalizeBody(BaseModel):
+    split_unclaimed: bool = False
 
 
 # Summary
@@ -125,10 +132,21 @@ class PersonSummary(BaseModel):
     total: Decimal
 
 
+class UnclaimedItem(BaseModel):
+    item_id: uuid.UUID
+    name: str
+    amount: Decimal
+
+
 class SummaryOut(BaseModel):
     title: str = "Receipt"
     currency: str
     people: list[PersonSummary]
+    # Items nobody claimed. Their cost is in no one's total, so the totals
+    # below add up to less than the receipt — the client warns rather than
+    # showing a smaller bill as if it were the whole one.
+    unclaimed: list[UnclaimedItem] = []
+    unclaimed_total: Decimal = Decimal("0")
 
 
 # Receipt scan

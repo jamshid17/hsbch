@@ -108,3 +108,25 @@ def calculate_summary(session, items, people, assignments) -> list[dict]:
         )
 
     return results
+
+
+def unclaimed_items(items, assignments) -> list[dict]:
+    """Items nobody claimed, with the money riding on each one.
+
+    calculate_summary has nobody to charge for these, so it skips them and the
+    people's totals quietly add up to less than the receipt. Naming them is
+    what lets the host see the gap before finalizing instead of handing out a
+    split that's short by the price of the bread.
+    """
+    claimed = {a.item_id for a in assignments if Decimal(str(a.quantity)) > 0}
+    return [
+        {
+            "item_id": item.id,
+            "name": item.name,
+            "amount": (Decimal(str(item.price)) * Decimal(str(item.quantity))).quantize(
+                CENT, ROUND_HALF_UP
+            ),
+        }
+        for item in items
+        if item.id not in claimed
+    ]

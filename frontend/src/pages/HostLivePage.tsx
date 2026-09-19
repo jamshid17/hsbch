@@ -7,6 +7,7 @@ import { api, SummaryOut } from "../api";
 import { tg } from "../telegram";
 import { useSessionSocket } from "../lib/useSessionSocket";
 import Skeleton from "../components/Skeleton";
+import UnclaimedSheet from "../components/UnclaimedSheet";
 
 function fmt(value: string | number): string {
   const num = typeof value === "string" ? parseFloat(value) : value;
@@ -22,6 +23,7 @@ export default function HostLivePage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
+  const [askUnclaimed, setAskUnclaimed] = useState(false);
 
   // Live updates: refetch the breakdown the instant anyone changes their picks.
   useSessionSocket(sessionId);
@@ -45,9 +47,20 @@ export default function HostLivePage() {
   });
 
   const finalizeMutation = useMutation({
-    mutationFn: () => api.finalizeSession(sessionId!),
+    mutationFn: (splitUnclaimed: boolean) =>
+      api.finalizeSession(sessionId!, splitUnclaimed),
     onSuccess: () => navigate(`/summary/${sessionId}`),
   });
+
+  // Items nobody picked are charged to nobody, so finalizing now would hand
+  // out a split that's short by their price. Ask before that happens.
+  const unclaimed = summary?.unclaimed ?? [];
+  const unclaimedTotal = parseFloat(summary?.unclaimed_total ?? "0");
+
+  function handleFinalize() {
+    if (unclaimed.length > 0) setAskUnclaimed(true);
+    else finalizeMutation.mutate(false);
+  }
 
   const code = session?.code || "";
   const cur = summary?.currency || "";
@@ -151,13 +164,34 @@ export default function HostLivePage() {
         {t("host.pickMine")}
       </button>
 
+      {unclaimed.length > 0 && (
+        <p className="notice notice-warn">
+          {t("unclaimed.notice", {
+            count: unclaimed.length,
+            amount: `${fmt(unclaimedTotal)} ${cur}`.trim(),
+          })}
+        </p>
+      )}
+
       <button
         className="btn"
         disabled={finalizeMutation.isPending}
-        onClick={() => finalizeMutation.mutate()}
+        onClick={handleFinalize}
       >
         {finalizeMutation.isPending ? t("host.finalizing") : t("host.finalize")}
       </button>
+
+      {askUnclaimed && summary && (
+        <UnclaimedSheet
+          items={unclaimed}
+          total={summary.unclaimed_total}
+          currency={cur}
+          busy={finalizeMutation.isPending}
+          onSplitEvenly={() => finalizeMutation.mutate(true)}
+          onIgnore={() => finalizeMutation.mutate(false)}
+          onCancel={() => setAskUnclaimed(false)}
+        />
+      )}
 
       <AnimatePresence>
         {copied && (

@@ -1,11 +1,12 @@
 import logging
 import uuid
+from decimal import Decimal
 
-from app.calculator import calculate_summary
+from app.calculator import calculate_summary, unclaimed_items
 from app.db import get_db
 from app.models import Assignment, Item, Person
 from app.models import Session as SessionModel
-from app.schemas import SummaryOut
+from app.schemas import SummaryOut, UnclaimedItem
 from app.services.telegram_auth import TelegramUser, get_tg_user
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import select
@@ -38,7 +39,11 @@ def _inline_query(title: str | None, code: str, lang: str) -> str:
 
 
 @router.get("/{session_id}/summary", response_model=SummaryOut)
-def get_summary(session_id: uuid.UUID, db: Session = Depends(get_db)):
+def get_summary(
+    session_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _user: TelegramUser = Depends(get_tg_user),
+):
     session = db.get(SessionModel, session_id)
     if not session:
         raise HTTPException(404, "Session not found")
@@ -65,7 +70,14 @@ def get_summary(session_id: uuid.UUID, db: Session = Depends(get_db)):
     )
 
     breakdown = calculate_summary(session, items, people, assignments)
-    return SummaryOut(title=session.title or "Receipt", currency=session.currency, people=breakdown)
+    unclaimed = unclaimed_items(items, assignments)
+    return SummaryOut(
+        title=session.title or "Receipt",
+        currency=session.currency,
+        people=breakdown,
+        unclaimed=[UnclaimedItem(**u) for u in unclaimed],
+        unclaimed_total=sum((u["amount"] for u in unclaimed), Decimal("0")),
+    )
 
 
 @router.post("/{session_id}/summary/image", status_code=204)

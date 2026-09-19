@@ -125,6 +125,30 @@ export default {
     finalizing: "Завершение…",
     waiting: "Ожидаем присоединения людей…",
   },
+  // Items nobody picked. Their cost is charged to no one, so the split comes
+  // out smaller than the receipt unless the host does something about it.
+  unclaimed: {
+    notice:
+        "⚠️ {{count}} позицию никто не выбрал — {{amount}} не попадает ни в чей счёт.",
+    notice_few:
+        "⚠️ {{count}} позиции никто не выбрал — {{amount}} не попадает ни в чей счёт.",
+    notice_many:
+        "⚠️ {{count}} позиций никто не выбрал — {{amount}} не попадает ни в чей счёт.",
+    title: "{{count}} позиция без выбора",
+    title_few: "{{count}} позиции без выбора",
+    title_many: "{{count}} позиций без выбора",
+    body:
+        "Их сумма {{amount}} не попала ни в чей счёт. Если завершить так, итог выйдет меньше чека.",
+    splitEvenly: "Разделить на всех поровну",
+    ignore: "Всё равно завершить",
+    back: "Вернуться и выбрать",
+    summaryNote:
+        "ℹ️ {{count}} позиция ({{amount}}) никому не назначена и в итог не вошла.",
+    summaryNote_few:
+        "ℹ️ {{count}} позиции ({{amount}}) никому не назначены и в итог не вошли.",
+    summaryNote_many:
+        "ℹ️ {{count}} позиций ({{amount}}) никому не назначены и в итог не вошли.",
+  },
   summary: {
     title: "Кто сколько должен",
     taxTip: "Налог + чаевые",

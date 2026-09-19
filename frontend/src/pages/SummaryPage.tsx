@@ -226,6 +226,17 @@ export default function SummaryPage() {
         <span>{fmt(grandTotal)} {summary.currency}</span>
       </div>
 
+      {/* The host finalized with items nobody picked. Saying so is what keeps
+          the total above honest: it is the split, not the receipt. */}
+      {(summary.unclaimed ?? []).length > 0 && (
+        <p className="notice">
+          {t("unclaimed.summaryNote", {
+            count: summary.unclaimed.length,
+            amount: `${fmt(summary.unclaimed_total)} ${summary.currency}`.trim(),
+          })}
+        </p>
+      )}
+
       <button className="btn" onClick={handleShare}>
         {tg.initData ? t("summary.shareBtn") : t("summary.shareBtnFallback")}
       </button>

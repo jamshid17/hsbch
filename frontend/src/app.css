@@ -1012,6 +1012,14 @@ input:focus {
   line-height: 1.45;
 }
 
+/* A notice the reader has to decide about, not just absorb — e.g. "nobody
+   picked the bread". The hue is the difference from a plain .notice. */
+.notice-warn {
+  border-left-color: #f08c00;
+  background: color-mix(in srgb, #f08c00 10%, transparent);
+  color: var(--text);
+}
+
 .btn-mini {
   font-size: 12px;
   font-weight: 600;

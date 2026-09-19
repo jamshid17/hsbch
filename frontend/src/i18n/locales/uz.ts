@@ -125,6 +125,25 @@ export default {
     finalizing: "Yakunlanmoqda…",
     waiting: "Odamlar qo'shilishini kutilmoqda…",
   },
+  // Items nobody picked. Their cost is charged to no one, so the split comes
+  // out smaller than the receipt unless the host does something about it.
+  unclaimed: {
+    notice:
+        "⚠️ {{count}} ta mahsulotni hech kim tanlamagan — {{amount}} hech kimning hisobiga kirmayapti.",
+    notice_other:
+        "⚠️ {{count}} ta mahsulotni hech kim tanlamagan — {{amount}} hech kimning hisobiga kirmayapti.",
+    title: "{{count}} ta mahsulot tanlanmagan",
+    title_other: "{{count}} ta mahsulot tanlanmagan",
+    body:
+        "Ularning {{amount}} summasi hech kimning hisobiga kirmagan. Shu holda yakunlasangiz, jami chekdan kam chiqadi.",
+    splitEvenly: "Hammaga teng bo'lish",
+    ignore: "Baribir yakunlash",
+    back: "Orqaga qaytib tanlash",
+    summaryNote:
+        "ℹ️ {{count}} ta mahsulot ({{amount}}) hech kimga biriktirilmagan va bu jamiga kirmagan.",
+    summaryNote_other:
+        "ℹ️ {{count}} ta mahsulot ({{amount}}) hech kimga biriktirilmagan va bu jamiga kirmagan.",
+  },
   summary: {
     title: "Kim qancha to'laydi",
     taxTip: "Soliq + tip ulushi",

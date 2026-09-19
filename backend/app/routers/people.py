@@ -18,7 +18,11 @@ def _require_host(session: SessionModel, user: TelegramUser) -> None:
 
 
 @router.get("/{session_id}/people", response_model=list[PersonOut])
-def list_people(session_id: uuid.UUID, db: Session = Depends(get_db)):
+def list_people(
+    session_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _user: TelegramUser = Depends(get_tg_user),
+):
     session = db.get(SessionModel, session_id)
     if not session:
         raise HTTPException(404, "Session not found")

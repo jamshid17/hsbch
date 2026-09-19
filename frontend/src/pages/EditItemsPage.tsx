@@ -123,7 +123,7 @@ export default function EditItemsPage() {
     queryFn: async () => {
       const [rawItems, session] = await Promise.all([
         api.listItems(sessionId!),
-        fetch(`/api/sessions/${sessionId}`).then((r) => r.json()),
+        api.getSession(sessionId!),
       ]);
       return { rawItems, session };
     },

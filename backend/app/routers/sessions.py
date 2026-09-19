@@ -1,7 +1,9 @@
 import secrets
 import string
 import uuid
+from decimal import ROUND_HALF_UP, Decimal
 
+from app.calculator import unclaimed_items
 from app.db import get_db
 from app.enum import SourceEnum
 from app.models import Session as SessionModel
@@ -9,6 +11,7 @@ from app.schemas import SessionCreate, SessionOut, SessionUpdate
 from app.models import Assignment, Item, Person
 from app.models import Session as SessionModel
 from app.schemas import (
+    FinalizeBody,
     HostAssignmentsUpdate,
     MyAssignmentsUpdate,
     ParticipantOut,
@@ -16,6 +19,7 @@ from app.schemas import (
     PickOut,
     SessionOut,
 )
+from app.services.ratelimit import SlidingWindowLimiter
 from app.services.telegram_auth import TelegramUser, get_tg_user
 from app.ws import manager
 from fastapi import APIRouter, Depends, HTTPException
@@ -38,6 +42,63 @@ def _generate_code(db: Session) -> str:
         if not exists:
             return code
     raise HTTPException(500, "Could not allocate a session code")
+
+
+# A four-digit code is small enough to enumerate, and every session behind one
+# is somebody's restaurant bill. A person joining a bill looks it up once.
+_code_lookups = SlidingWindowLimiter(limit=20, window_seconds=60)
+
+# Quantities are stored with three decimals; an even split has to land on that
+# grid. The calculator divides a line total by the ratio of claimed quantities,
+# so what matters is only that everyone's figure is the same.
+_QTY_STEP = Decimal("0.001")
+
+
+def _require_host(session: SessionModel, user: TelegramUser, action: str) -> None:
+    if session.telegram_chat_id != user.id:
+        raise HTTPException(403, f"Only the host can {action}")
+
+
+def _split_unclaimed_evenly(db: Session, session_id: uuid.UUID) -> None:
+    """Hand every unclaimed item to everyone in equal parts.
+
+    An item nobody picked is charged to nobody at all (see
+    calculator.unclaimed_items), so its price leaves the split. This is the
+    host's way out of that: the shared bread gets shared.
+    """
+    items = (
+        db.execute(select(Item).where(Item.session_id == session_id)).scalars().all()
+    )
+    people = (
+        db.execute(select(Person).where(Person.session_id == session_id))
+        .scalars()
+        .all()
+    )
+    if not items or not people:
+        return
+
+    assignments = (
+        db.execute(
+            select(Assignment).where(Assignment.item_id.in_([i.id for i in items]))
+        )
+        .scalars()
+        .all()
+    )
+    unclaimed = {u["item_id"] for u in unclaimed_items(items, assignments)}
+    if not unclaimed:
+        return
+
+    for item in items:
+        if item.id not in unclaimed:
+            continue
+        share = max(
+            (Decimal(str(item.quantity)) / len(people)).quantize(
+                _QTY_STEP, ROUND_HALF_UP
+            ),
+            _QTY_STEP,
+        )
+        for person in people:
+            db.add(Assignment(item_id=item.id, person_id=person.id, quantity=share))
 
 
 def _upsert_person(db: Session, session_id: uuid.UUID, user: TelegramUser) -> Person:
@@ -89,19 +150,26 @@ def update_session(
     session = db.get(SessionModel, session_id)
     if not session:
         raise HTTPException(404, "Session not found")
+    _require_host(session, user, "edit this bill")
     if body.title is not None:
         session.title = body.title
     if body.assignment_mode is not None:
-        if session.telegram_chat_id != user.id:
-            raise HTTPException(403, "Only the host can change the split mode")
         if body.assignment_mode not in ("collaborative", "host_assigns"):
             raise HTTPException(400, "Invalid assignment_mode")
         session.assignment_mode = body.assignment_mode
     db.commit()
     db.refresh(session)
     return session
+
+
 @router.get("/by-code/{code}", response_model=SessionOut)
-def get_session_by_code(code: str, db: Session = Depends(get_db)):
+def get_session_by_code(
+    code: str,
+    db: Session = Depends(get_db),
+    user: TelegramUser = Depends(get_tg_user),
+):
+    if not _code_lookups.hit(user.id):
+        raise HTTPException(429, "Too many code lookups. Try again in a minute.")
     row = db.execute(
         select(SessionModel).where(SessionModel.code == code.upper().strip())
     ).scalar_one_or_none()
@@ -111,7 +179,11 @@ def get_session_by_code(code: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{session_id}", response_model=SessionOut)
-def get_session(session_id: uuid.UUID, db: Session = Depends(get_db)):
+def get_session(
+    session_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _user: TelegramUser = Depends(get_tg_user),
+):
     row = db.get(SessionModel, session_id)
     if not row:
         raise HTTPException(404, "Session not found")
@@ -135,7 +207,11 @@ def join_session(
 
 
 @router.get("/{session_id}/participants", response_model=list[ParticipantOut])
-def list_participants(session_id: uuid.UUID, db: Session = Depends(get_db)):
+def list_participants(
+    session_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _user: TelegramUser = Depends(get_tg_user),
+):
     session = db.get(SessionModel, session_id)
     if not session:
         raise HTTPException(404, "Session not found")
@@ -229,8 +305,7 @@ def update_host_assignments(
     session = db.get(SessionModel, session_id)
     if not session:
         raise HTTPException(404, "Session not found")
-    if session.telegram_chat_id != user.id:
-        raise HTTPException(403, "Only the host can assign items")
+    _require_host(session, user, "assign items")
 
     valid_item_ids = set(
         db.execute(select(Item.id).where(Item.session_id == session_id)).scalars().all()
@@ -260,6 +335,10 @@ def update_host_assignments(
             )
         )
 
+    if body.split_unclaimed:
+        db.flush()
+        _split_unclaimed_evenly(db, session_id)
+
     session.status = "done"
     db.commit()
     db.refresh(session)
@@ -270,14 +349,16 @@ def update_host_assignments(
 @router.post("/{session_id}/finalize", response_model=SessionOut)
 def finalize_session(
     session_id: uuid.UUID,
+    body: FinalizeBody = FinalizeBody(),
     db: Session = Depends(get_db),
     user: TelegramUser = Depends(get_tg_user),
 ):
     session = db.get(SessionModel, session_id)
     if not session:
         raise HTTPException(404, "Session not found")
-    if session.telegram_chat_id != user.id:
-        raise HTTPException(403, "Only the host can finalize the session")
+    _require_host(session, user, "finalize the session")
+    if body.split_unclaimed:
+        _split_unclaimed_evenly(db, session_id)
     session.status = "done"
     db.commit()
     db.refresh(session)

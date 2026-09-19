@@ -87,10 +87,20 @@ export interface PersonSummary {
   total: string;
 }
 
+export interface UnclaimedItem {
+  item_id: string;
+  name: string;
+  amount: string;
+}
+
 export interface SummaryOut {
   title: string;
   currency: string;
   people: PersonSummary[];
+  /** Items nobody picked. Their cost is in nobody's total, so the people
+   * below add up to less than the receipt until this is empty. */
+  unclaimed: UnclaimedItem[];
+  unclaimed_total: string;
 }
 
 export interface ScanResult {
@@ -303,8 +313,13 @@ export const api = {
       body: JSON.stringify({ picks }),
     }),
 
-  finalizeSession: (sessionId: string) =>
-    request<SessionOut>(`/sessions/${sessionId}/finalize`, { method: "POST" }),
+  /** `splitUnclaimed` hands anything nobody picked to everyone in equal
+   * parts, instead of letting its cost fall out of the split. */
+  finalizeSession: (sessionId: string, splitUnclaimed = false) =>
+    request<SessionOut>(`/sessions/${sessionId}/finalize`, {
+      method: "POST",
+      body: JSON.stringify({ split_unclaimed: splitUnclaimed }),
+    }),
 
   getSummary: (sessionId: string) =>
     request<SummaryOut>(`/sessions/${sessionId}/summary`),
@@ -358,10 +373,11 @@ export const api = {
 
   setHostAssignments: (
     sessionId: string,
-    assignments: { item_id: string; person_id: string; quantity: string }[]
+    assignments: { item_id: string; person_id: string; quantity: string }[],
+    splitUnclaimed = false
   ) =>
     request<SessionOut>(`/sessions/${sessionId}/host-assignments`, {
       method: "PUT",
-      body: JSON.stringify({ assignments }),
+      body: JSON.stringify({ assignments, split_unclaimed: splitUnclaimed }),
     }),
 };

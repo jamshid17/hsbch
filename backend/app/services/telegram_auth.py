@@ -157,19 +157,16 @@ def _verify_init_data(init_data: str) -> dict:
         logger.info("initData matched Ed25519 signature")
         return dict(parse_qsl(init_data))
 
-    # TEMPORARY diagnostics (token fingerprint only, plus the user's own
-    # initData) to debug remaining signature failures. Remove once resolved.
-    debug = {
-        "error": "Invalid initData signature",
-        "recv": (received_hash or "")[:8],
-        "attempts": attempts,
-        "sig_present": "signature" in dict(_split_pairs(init_data)),
-        "bot_id": settings.bot_token.split(":")[0],
-        "token_fp": hashlib.sha256(settings.bot_token.encode()).hexdigest()[:10],
-        "raw": init_data[:600],
-    }
-    logger.warning("initData mismatch: %s", debug)
-    raise HTTPException(401, debug)
+    # Enough to tell a wrong bot token from a decoding mismatch, without the
+    # credential itself or the caller's signed payload ending up in the logs —
+    # or, worse, in the 401 body that goes back over the wire.
+    logger.warning(
+        "initData rejected: recv=%s variants=%s signature_present=%s",
+        (received_hash or "")[:8],
+        attempts,
+        "signature" in dict(_split_pairs(init_data)),
+    )
+    raise HTTPException(401, "Invalid Telegram initData signature")
 
 
 def _user_from_fields(pairs: dict) -> TelegramUser:
