@@ -46,6 +46,11 @@ class Session(Base):
     assignment_mode: Mapped[str] = mapped_column(
         String(20), nullable=False, default="collaborative"
     )
+    # Telegram file_id of the rendered "who owes what" image, kept so the
+    # inline share result can resend the same photo without re-uploading it.
+    summary_image_file_id: Mapped[str | None] = mapped_column(
+        String(256), nullable=True
+    )
 
     items: Mapped[list["Item"]] = relationship(
         "Item", back_populates="session", cascade="all, delete-orphan"

@@ -134,6 +134,13 @@ export default {
     copied: "✓ Copied to clipboard",
     grandTotal: "Grand total",
     failedLoad: "Failed to load",
+    shareImageBtn: "🖼 Share as image",
+    imageBuilding: "Building the image…",
+    imageSent: "✓ Image sent to the bot — share it from there",
+    imageSaved: "✓ Image saved",
+    imageFailed: "Couldn't build the image. Try again.",
+    imageShareLabel: "Share",
+    imageBrand: "Bill Splitter",
   },
   card: {
     title: "💳 Pay by card",

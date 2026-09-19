@@ -134,6 +134,13 @@ export default {
     copied: "✓ Скопировано",
     grandTotal: "Итого",
     failedLoad: "Ошибка загрузки",
+    shareImageBtn: "🖼 Поделиться картинкой",
+    imageBuilding: "Готовим картинку…",
+    imageSent: "✓ Картинка отправлена в бот — поделитесь оттуда",
+    imageSaved: "✓ Картинка сохранена",
+    imageFailed: "Не удалось сделать картинку. Попробуйте ещё раз.",
+    imageShareLabel: "Поделиться",
+    imageBrand: "Bill Splitter",
   },
   card: {
     title: "💳 Оплата картой",

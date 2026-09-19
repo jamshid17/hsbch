@@ -134,6 +134,13 @@ export default {
     copied: "✓ Buferga nusxalandi",
     grandTotal: "Jami",
     failedLoad: "Yuklab bo'lmadi",
+    shareImageBtn: "🖼 Rasm sifatida ulashish",
+    imageBuilding: "Rasm tayyorlanmoqda…",
+    imageSent: "✓ Rasm botga yuborildi — o'sha yerdan ulashing",
+    imageSaved: "✓ Rasm saqlandi",
+    imageFailed: "Rasm tayyorlanmadi. Qaytadan urinib ko'ring.",
+    imageShareLabel: "Ulashish",
+    imageBrand: "Hisob bo'luvchi",
   },
   card: {
     title: "💳 Karta orqali to'lash",

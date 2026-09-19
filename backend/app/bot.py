@@ -1,3 +1,4 @@
+import html
 import uuid
 
 from aiogram import Bot, Dispatcher, Router
@@ -7,6 +8,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineQuery,
     InlineQueryResultArticle,
+    InlineQueryResultCachedPhoto,
     InputTextMessageContent,
     MenuButtonWebApp,
     Message,
@@ -113,9 +115,11 @@ async def handle_inline_query(query: InlineQuery):
         assignments = assign_r.scalars().all()
 
         summary = calculate_summary(session, items, people, assignments)
+        image_file_id = session.summary_image_file_id
 
     cur = session.currency or ""
     total_all = sum(float(p["total"]) for p in summary)
+    description = f"{len(summary)} people · {cur}{total_all:,.2f} total"
 
     # Build receipt text
     lines = ["🧾 <b>Bill Split</b>", ""]
@@ -130,15 +134,30 @@ async def handle_inline_query(query: InlineQuery):
     lines.append(f"💰 <b>Total: {cur}{total_all:,.2f}</b>")
     text = "\n".join(lines)
 
-    result = InlineQueryResultArticle(
-        id=str(session_id),
-        title="Send bill split to this chat",
-        description=f"{len(summary)} people · {cur}{total_all:,.2f} total",
-        input_message_content=InputTextMessageContent(
-            message_text=text,
+    # The Mini App uploaded a rendered card for this split — share the picture
+    # itself, which reads far better in a group than the same numbers as text.
+    if image_file_id:
+        result = InlineQueryResultCachedPhoto(
+            id=f"{session_id}-photo",
+            photo_file_id=image_file_id,
+            title="Send bill split to this chat",
+            description=description,
+            caption=(
+                f"🧾 <b>{html.escape(session.title or 'Bill Split')}</b>"
+                f" — {cur}{total_all:,.2f}"
+            ),
             parse_mode="HTML",
-        ),
-    )
+        )
+    else:
+        result = InlineQueryResultArticle(
+            id=str(session_id),
+            title="Send bill split to this chat",
+            description=description,
+            input_message_content=InputTextMessageContent(
+                message_text=text,
+                parse_mode="HTML",
+            ),
+        )
 
     await query.answer([result], cache_time=300, is_personal=True)
 

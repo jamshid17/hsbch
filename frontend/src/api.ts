@@ -309,6 +309,25 @@ export const api = {
   getSummary: (sessionId: string) =>
     request<SummaryOut>(`/sessions/${sessionId}/summary`),
 
+  /** Hands the rendered split card to the bot, which posts it to the user's
+   * own chat with a share button — a Mini App can't put a file in a chat
+   * itself. Resolves with nothing; 409 means the bot may not write to them. */
+  sendSummaryImage: (
+    sessionId: string,
+    image: Blob,
+    caption: string,
+    shareLabel: string
+  ) => {
+    const form = new FormData();
+    form.append("file", image, "hisob.png");
+    form.append("caption", caption);
+    form.append("share_label", shareLabel);
+    return request<void>(`/sessions/${sessionId}/summary/image`, {
+      method: "POST",
+      body: form,
+    });
+  },
+
   updateSession: (sessionId: string, data: { title?: string; assignment_mode?: string }) =>
     request<SessionOut>(`/sessions/${sessionId}`, {
       method: "PATCH",
