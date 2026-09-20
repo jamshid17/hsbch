@@ -154,6 +154,10 @@ export default {
     open: "still open",
   },
   summary: {
+    markPaid: "Mark {{name}} as paid",
+    markUnpaid: "Mark {{name}} as not paid",
+    paidCount: "{{paid}} of {{total}} have paid",
+    allPaid: "✅ Everyone has paid",
     title: "Who owes what",
     taxTip: "Tax + tip share",
     shareBtn: "📤 Share in Telegram",

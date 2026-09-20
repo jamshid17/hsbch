@@ -114,6 +114,15 @@ class AddPersonBody(BaseModel):
     name: str
 
 
+class PaidIn(BaseModel):
+    paid: bool = True
+
+
+class PaidOut(BaseModel):
+    person_id: uuid.UUID
+    paid: bool
+
+
 class PersonNameIn(BaseModel):
     name: str
 
@@ -143,10 +152,16 @@ class FinalizeBody(BaseModel):
 class PersonSummary(BaseModel):
     person_id: uuid.UUID
     name: str
+    # Which row is the reader's own, so the app knows whose "paid" tick they
+    # may set. Null for a name the host typed in rather than a participant.
+    telegram_user_id: int | None = None
     items: list[dict]
     subtotal: Decimal
     extras: Decimal
     total: Decimal
+    # Settled up. Not the calculator's business — it works out what is owed,
+    # not what has been handed over — so the router fills this in.
+    paid: bool = False
 
 
 class UnclaimedItem(BaseModel):

@@ -155,6 +155,10 @@ export default {
     open: "davom etmoqda",
   },
   summary: {
+    markPaid: "{{name}} to'ladi deb belgilash",
+    markUnpaid: "{{name}} ning to'lovini bekor qilish",
+    paidCount: "{{total}} kishidan {{paid}} tasi to'ladi",
+    allPaid: "✅ Hamma to'ladi",
     title: "Kim qancha to'laydi",
     taxTip: "Soliq + tip ulushi",
     shareBtn: "📤 Telegram'da ulashish",

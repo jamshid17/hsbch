@@ -539,6 +539,52 @@ input:focus {
 .summary-name {
   font-size: 15px;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Settled up. A 28px target rather than the 24px checkmark elsewhere: this
+   one is pressed with a thumb while holding cash. */
+.paid-tick {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid var(--hint);
+  background: transparent;
+  color: var(--button-text);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s;
+}
+
+.paid-tick.paid {
+  background: #2e9c46;
+  border-color: #2e9c46;
+  color: #fff;
+}
+
+.paid-tick:disabled {
+  opacity: 0.6;
+}
+
+/* Someone else's row: still shows whether they've paid, but isn't a button. */
+.paid-tick-readonly {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.paid-tick:focus-visible {
+  outline: 2px solid var(--button);
+  outline-offset: 2px;
 }
 
 .summary-total-block {

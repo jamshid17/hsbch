@@ -161,6 +161,10 @@ export default {
     open: "не завершён",
   },
   summary: {
+    markPaid: "Отметить, что {{name}} заплатил",
+    markUnpaid: "Снять отметку об оплате у {{name}}",
+    paidCount: "Заплатили {{paid}} из {{total}}",
+    allPaid: "✅ Все заплатили",
     title: "Кто сколько должен",
     taxTip: "Налог + чаевые",
     shareBtn: "📤 Поделиться в Telegram",

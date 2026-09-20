@@ -106,6 +106,10 @@ class Person(Base):
     # Telegram user id of this participant (null for legacy manually-added people).
     telegram_user_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
+    # When this person settled up. The split says what everyone owes and then
+    # stopped; the part the table actually argues about afterwards is who has
+    # handed the money over, which lived in somebody's memory until now.
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     session: Mapped["Session"] = relationship("Session", back_populates="people")
     assignments: Mapped[list["Assignment"]] = relationship(

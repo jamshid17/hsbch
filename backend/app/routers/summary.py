@@ -70,6 +70,11 @@ def get_summary(
     )
 
     breakdown = calculate_summary(session, items, people, assignments)
+    paid_ids = {p.id for p in people if p.paid_at is not None}
+    owners = {p.id: p.telegram_user_id for p in people}
+    for row in breakdown:
+        row["paid"] = row["person_id"] in paid_ids
+        row["telegram_user_id"] = owners.get(row["person_id"])
     unclaimed = unclaimed_items(items, assignments)
     return SummaryOut(
         title=session.title or "Receipt",

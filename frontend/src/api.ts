@@ -96,10 +96,16 @@ export interface ParticipantOut {
 export interface PersonSummary {
   person_id: string;
   name: string;
+  /** Whose row this is, so the app knows whose tick the reader may set.
+   * Null for a name the host typed in rather than a participant. */
+  telegram_user_id: number | null;
   items: { name: string; share: string }[];
   subtotal: string;
   extras: string;
   total: string;
+  /** Settled up. What the split never said and the table always argues
+   * about afterwards. */
+  paid: boolean;
 }
 
 export interface UnclaimedItem {
@@ -367,6 +373,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ split_unclaimed: splitUnclaimed }),
     }),
+
+  /** Tick someone as settled up, or take the tick back. The host may set
+   * anyone's; everyone else only their own. */
+  setPaid: (sessionId: string, personId: string, paid: boolean) =>
+    request<{ person_id: string; paid: boolean }>(
+      `/sessions/${sessionId}/people/${personId}/paid`,
+      { method: "POST", body: JSON.stringify({ paid }) },
+    ),
 
   getSummary: (sessionId: string) =>
     request<SummaryOut>(`/sessions/${sessionId}/summary`),

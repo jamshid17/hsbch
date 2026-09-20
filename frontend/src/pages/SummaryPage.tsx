@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
-import { api, SummaryOut } from "../api";
+import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
+import clsx from "clsx";
+import { api, PersonSummary, SummaryOut } from "../api";
 import { renderSummaryImage } from "../lib/receiptImage";
-import { tg } from "../telegram";
+import { getTelegramUser, haptic, tg } from "../telegram";
+import { useSessionSocket } from "../lib/useSessionSocket";
 import Skeleton from "../components/Skeleton";
 
 // Format number with space as thousands separator, strip trailing .00
@@ -48,40 +51,62 @@ export default function SummaryPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
 
-  const [summary, setSummary] = useState<SummaryOut | null>(null);
-  const [shareLink, setShareLink] = useState("");
-  const [code, setCode] = useState("");
-  const [botUsername, setBotUsername] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
+  const myId = getTelegramUser().id;
   const [toast, setToast] = useState("");
   const [imageBusy, setImageBusy] = useState(false);
 
-  useEffect(() => {
-    Promise.all([
-      api.getSummary(sessionId!),
-      api.getSession(sessionId!),
-      api.getConfig(),
-    ])
-      .then(([sum, session, config]) => {
-        setSummary(sum);
-        setBotUsername(config.bot_username);
-        setCode(session.code);
-        // Same deep link as the invite, and the session id for the same
-        // reason: this one is shared into a chat and read months later, long
-        // after the code has gone back in the pool. JoinPage routes a `done`
-        // session straight here.
-        setShareLink(
-          config.bot_username
-            ? `https://t.me/${config.bot_username}?startapp=${session.id}`
-            : `${window.location.origin}/?join=${session.id}`
-        );
-      })
-      .catch((e: unknown) =>
-        setError(e instanceof Error ? e.message : t("summary.failedLoad"))
-      )
-      .finally(() => setLoading(false));
-  }, [sessionId]);
+  // Queries rather than a one-shot fetch: the paid ticks are live, and the
+  // socket below refreshes the summary the moment anyone settles up.
+  const [summaryQ, sessionQ, configQ] = useQueries({
+    queries: [
+      { queryKey: ["summary", sessionId], queryFn: () => api.getSummary(sessionId!) },
+      { queryKey: ["session", sessionId], queryFn: () => api.getSession(sessionId!) },
+      { queryKey: ["config"], queryFn: () => api.getConfig(), staleTime: Infinity },
+    ],
+  });
+
+  useSessionSocket(sessionId);
+
+  const summary: SummaryOut | undefined = summaryQ.data;
+  const session = sessionQ.data;
+  const code = session?.code ?? "";
+  const botUsername = configQ.data?.bot_username ?? null;
+  const loading = summaryQ.isLoading || sessionQ.isLoading;
+  const error = summaryQ.isError
+    ? ((summaryQ.error as Error).message ?? t("summary.failedLoad"))
+    : "";
+
+  // Same deep link as the invite, and the session id for the same reason:
+  // this one is shared into a chat and read months later, long after the code
+  // has gone back in the pool. JoinPage routes a `done` session straight here.
+  const shareLink = session
+    ? botUsername
+      ? `https://t.me/${botUsername}?startapp=${session.id}`
+      : `${window.location.origin}/?join=${session.id}`
+    : "";
+
+  const isHost = !!session && session.telegram_chat_id === myId;
+
+  const setPaid = useMutation({
+    mutationFn: ({ personId, paid }: { personId: string; paid: boolean }) =>
+      api.setPaid(sessionId!, personId, paid),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["summary", sessionId] }),
+  });
+
+  /** The host collects the money, so they tick anyone; everyone else only
+   * their own row — which is the case worth having: the host watches it
+   * happen instead of being told. */
+  function canTick(person: PersonSummary): boolean {
+    return isHost || (person.telegram_user_id !== null && person.telegram_user_id === myId);
+  }
+
+  function togglePaid(person: PersonSummary) {
+    if (!canTick(person) || setPaid.isPending) return;
+    haptic.select();
+    setPaid.mutate({ personId: person.person_id, paid: !person.paid });
+  }
 
   function showToast(message: string) {
     setToast(message);
@@ -176,12 +201,19 @@ export default function SummaryPage() {
     }
   }
 
-  if (loading) return <div className="page"><h1>{t("summary.title")}</h1><Skeleton count={3} height={130} /></div>;
+  if (loading)
+    return (
+      <div className="page">
+        <h1>{t("summary.title")}</h1>
+        <Skeleton count={3} height={130} />
+      </div>
+    );
 
   if (error) return <div className="page"><p className="error">{error}</p></div>;
   if (!summary) return null;
 
   const grandTotal = summary.people.reduce((sum, p) => sum + parseFloat(p.total), 0);
+  const paidCount = summary.people.filter((p) => p.paid).length;
 
   return (
     <div className="page">
@@ -195,9 +227,30 @@ export default function SummaryPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.06 }}
         >
-          {/* Header: name + total */}
+          {/* Header: name + total, and whether they've settled up */}
           <div className="summary-header">
-            <span className="summary-name">👤 {person.name}</span>
+            <span className="summary-name">
+              {canTick(person) ? (
+                <button
+                  className={clsx("paid-tick", { paid: person.paid })}
+                  aria-pressed={person.paid}
+                  aria-label={t(person.paid ? "summary.markUnpaid" : "summary.markPaid", {
+                    name: person.name,
+                  })}
+                  disabled={setPaid.isPending}
+                  onClick={() => togglePaid(person)}
+                >
+                  {person.paid ? "✓" : ""}
+                </button>
+              ) : (
+                <span className={clsx("paid-tick", "paid-tick-readonly", {
+                  paid: person.paid,
+                })}>
+                  {person.paid ? "✓" : ""}
+                </span>
+              )}
+              {person.name}
+            </span>
             <div className="summary-total-block">
               <span className="summary-total">{fmt(person.total)}</span>
               <span className="summary-cur">{summary.currency}</span>
@@ -227,6 +280,17 @@ export default function SummaryPage() {
         <span>{t("summary.grandTotal")}</span>
         <span>{fmt(grandTotal)} {summary.currency}</span>
       </div>
+
+      {/* How far along the settling-up is — the question people actually
+          reopen this screen to answer. */}
+      <p className="muted-line" style={{ textAlign: "center" }}>
+        {paidCount === summary.people.length
+          ? t("summary.allPaid")
+          : t("summary.paidCount", {
+              paid: paidCount,
+              total: summary.people.length,
+            })}
+      </p>
 
       {/* The host finalized with items nobody picked. Saying so is what keeps
           the total above honest: it is the split, not the receipt. */}

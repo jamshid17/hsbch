@@ -1,10 +1,12 @@
 import uuid
+from datetime import datetime, timezone
 
 from app.db import get_db
 from app.models import Person
 from app.models import Session as SessionModel
-from app.schemas import AddPersonBody, PeopleBulkUpdate, PersonOut
+from app.schemas import AddPersonBody, PaidIn, PaidOut, PeopleBulkUpdate, PersonOut
 from app.services.telegram_auth import TelegramUser, get_tg_user
+from app.ws import manager
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -90,6 +92,40 @@ def bulk_set_people(
     for person in new_people:
         db.refresh(person)
     return new_people
+
+
+@router.post("/{session_id}/people/{person_id}/paid", response_model=PaidOut)
+def set_paid(
+    session_id: uuid.UUID,
+    person_id: uuid.UUID,
+    body: PaidIn,
+    db: Session = Depends(get_db),
+    user: TelegramUser = Depends(get_tg_user),
+):
+    """Mark someone as having settled up, or take the mark back.
+
+    The host collects the money, so they may tick anyone. A guest may tick
+    themselves and nobody else — which is the case that makes this worth
+    having at all: the host doesn't have to be told, they watch it happen.
+    """
+    session = db.get(SessionModel, session_id)
+    if not session:
+        raise HTTPException(404, "Session not found")
+
+    person = db.get(Person, person_id)
+    if not person or person.session_id != session_id:
+        raise HTTPException(404, "Person not found")
+
+    is_host = session.telegram_chat_id == user.id
+    if not is_host and person.telegram_user_id != user.id:
+        raise HTTPException(403, "Only the host can mark someone else as paid")
+
+    person.paid_at = (
+        datetime.now(timezone.utc).replace(tzinfo=None) if body.paid else None
+    )
+    db.commit()
+    manager.notify(str(session_id), {"type": "updated", "status": session.status})
+    return PaidOut(person_id=person.id, paid=person.paid_at is not None)
 
 
 @router.delete("/{session_id}/people/{person_id}", status_code=204)
