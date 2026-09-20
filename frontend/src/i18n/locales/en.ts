@@ -1,4 +1,7 @@
 export default {
+  common: {
+    gotIt: "Got it",
+  },
   steps: {
     scan: "Scan",
     items: "Items",
@@ -24,6 +27,8 @@ export default {
     freeUsedUp: "Your {{total}} free scans are used up. A subscription unlocks more.",
   },
   scan: {
+    notReceiptTitle: "Not a receipt",
+    notReceiptHint: "Get the whole receipt in frame: good light, held straight, no shadow across it.",
     title: "Bill Splitter",
     subtitle: "Pick a photo of the receipt — we'll do the rest.",
     tapToSelect: "Tap to select receipt photo",
@@ -161,6 +166,7 @@ export default {
   // code missing here still reads as words — but in Uzbek, which is the whole
   // reason these exist.
   errors: {
+    generic: "Something went wrong ({{status}}). Please try again.",
     upload: {
       not_an_image: "Please upload a receipt photo only (JPG, PNG, WEBP). PDFs and other files aren't accepted.",
       empty: "An empty file was sent.",

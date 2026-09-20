@@ -1,20 +1,10 @@
-import i18n from "./i18n";
+import { ApiError, apiError } from "./lib/apiError";
 import { authHeaders } from "./telegram";
+
+export { ApiError };
 import type { TelegramAuthUser } from "./types/auth";
 
 const BASE = "/api";
-
-export class ApiError extends Error {
-  status: number;
-  /** Machine-readable name for the failure, when the server sent one.
-   * `message` is already translated; this is for branching on. */
-  code?: string;
-  constructor(message: string, status: number, code?: string) {
-    super(message);
-    this.status = status;
-    this.code = code;
-  }
-}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   // For FormData (file upload) we must NOT set Content-Type — the browser sets
@@ -30,32 +20,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
   if (!res.ok) {
-    const text = await res.text();
-    let message = text || res.statusText;
-    let code: string | undefined;
-    try {
-      const detail = JSON.parse(text)?.detail;
-      if (typeof detail === "string") {
-        // A developer-facing failure — "Session not found" and the like.
-        message = detail;
-      } else if (detail && typeof detail.code === "string") {
-        // One the user reads, so it gets said in their own language. The
-        // server sends its sentence too, so a code this build has no string
-        // for still reads as words rather than as a key.
-        code = detail.code;
-        // String(): t() is typed to allow a nested object for a key that
-        // names a group rather than a leaf, which these never do.
-        message = String(
-          i18n.t(`errors.${detail.code}`, {
-            ...(detail.params ?? {}),
-            defaultValue: detail.message ?? message,
-          }),
-        );
-      }
-    } catch {
-      // Not JSON — keep the raw text as the message.
-    }
-    throw new ApiError(message, res.status, code);
+    throw await apiError(res);
   }
   if (res.status === 204) return undefined as T;
   return res.json();

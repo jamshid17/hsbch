@@ -1,4 +1,7 @@
 export default {
+  common: {
+    gotIt: "Понятно",
+  },
   steps: {
     scan: "Скан",
     items: "Позиции",
@@ -24,6 +27,8 @@ export default {
     freeUsedUp: "Бесплатные {{total}} сканов закончились. Нужна подписка.",
   },
   scan: {
+    notReceiptTitle: "Это не чек",
+    notReceiptHint: "Чек должен быть виден целиком: снимайте при хорошем свете, прямо и без теней.",
     title: "Делим счёт",
     subtitle: "Выберите фото чека — остальное сделаем мы.",
     tapToSelect: "Нажмите, чтобы выбрать фото чека",
@@ -168,6 +173,7 @@ export default {
   // code missing here still reads as words — but in Uzbek, which is the whole
   // reason these exist.
   errors: {
+    generic: "Произошла ошибка ({{status}}). Попробуйте ещё раз.",
     upload: {
       not_an_image: "Загрузите только фото чека (JPG, PNG, WEBP). PDF и другие файлы не принимаются.",
       empty: "Отправлен пустой файл.",

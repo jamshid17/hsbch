@@ -55,19 +55,6 @@ export function authHeaders(): Record<string, string> {
 }
 
 /**
- * The language to open in, when nothing has been chosen yet.
- *
- * Telegram knows which language the person reads, so asking them again is a
- * step that buys nothing. `language_code` is a base tag ("ru") or a full one
- * ("pt-BR"); anything unsupported falls back to Uzbek.
- */
-export function preferredLanguage(supported: string[], fallback: string): string {
-  const code = WebApp.initDataUnsafe?.user?.language_code ?? "";
-  const base = code.toLowerCase().split("-")[0];
-  return supported.includes(base) ? base : fallback;
-}
-
-/**
  * What a deep link points at: ?join=<token> or Telegram's startapp param.
  *
  * Either a session id or a join code. Links posted into a chat carry the id,

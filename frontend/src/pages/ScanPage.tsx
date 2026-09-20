@@ -10,6 +10,7 @@ import {
   isAcceptedImage,
 } from "../lib/image";
 import { haptic } from "../telegram";
+import AlertSheet from "../components/AlertSheet";
 import Paywall from "../components/Paywall";
 
 export default function ScanPage() {
@@ -164,12 +165,22 @@ export default function ScanPage() {
         </div>
       )}
 
-      {error &&
-        (notReceipt ? (
-          <p className="notice notice-warn">⚠️ {error}</p>
-        ) : (
-          <p className="error">{error}</p>
-        ))}
+      {error && !notReceipt && <p className="error">{error}</p>}
+
+      {/* Not a receipt: the one failure the reader can fix on the spot, so
+          it asks for their attention and then hands them the picker. */}
+      {notReceipt && (
+        <AlertSheet
+          title={t("scan.notReceiptTitle")}
+          body={error}
+          hint={t("scan.notReceiptHint")}
+          actionLabel={t("scan.retry")}
+          onClose={() => {
+            setNotReceipt(false);
+            pick();
+          }}
+        />
+      )}
       {quotaExceeded && me && me.subscriptions_enabled && !me.is_subscribed && (
         <Paywall me={me} />
       )}

@@ -1,4 +1,7 @@
 export default {
+  common: {
+    gotIt: "Tushunarli",
+  },
   steps: {
     scan: "Skan",
     items: "Mahsulotlar",
@@ -24,6 +27,8 @@ export default {
     freeUsedUp: "Bepul {{total}} ta skan tugadi. Davom etish uchun obuna kerak.",
   },
   scan: {
+    notReceiptTitle: "Bu chek emas",
+    notReceiptHint: "Chek to'liq ko'rinsin: yorug' joyda, tik ushlab va soyasiz suratga oling.",
     title: "Hisob bo'luvchi",
     subtitle: "Chek rasmini tanlang — qolganini o'zimiz qilamiz.",
     tapToSelect: "Chek rasmini tanlash uchun bosing",
@@ -162,6 +167,7 @@ export default {
   // code missing here still reads as words — but in Uzbek, which is the whole
   // reason these exist.
   errors: {
+    generic: "Xatolik yuz berdi ({{status}}). Qayta urinib ko'ring.",
     upload: {
       not_an_image: "Faqat chek rasmini yuklang (JPG, PNG, WEBP). PDF va boshqa fayllar qabul qilinmaydi.",
       empty: "Bo'sh fayl yuborildi.",
