@@ -55,6 +55,8 @@ export default {
     needItem: "Add at least one item with a price. If this isn't a receipt, try a clearer photo.",
   },
   mode: {
+    equal: "Split evenly",
+    equalDesc: "Never mind who ate what — the bill splits equally. You only enter the names.",
     title: "How do you want to split?",
     collaborative: "Everyone picks their own",
     collaborativeDesc: "Share a code — everyone joins and picks what they had.",
@@ -62,6 +64,8 @@ export default {
     hostAssignsDesc: "No one else opens the app — you enter names and mark who had what yourself.",
   },
   people: {
+    subtitleEqual: "Who's splitting this — the bill divides equally between them.",
+    splitEqually: "Split evenly and finish",
     title: "Participants",
     subtitle: "Enter who you're splitting this bill with.",
     addPerson: "+ Add person",
@@ -72,6 +76,9 @@ export default {
     failedSave: "Failed to save",
   },
   assign: {
+    splitEqually: "Split evenly",
+    splitEquallyBody: "The whole bill splits equally between everyone. Anything you assigned by hand is discarded.",
+    splitEquallyConfirm: "Yes, split evenly",
     title: "Who had what?",
     subtitle: "Tap an item and mark who had it.",
     editPeople: "Edit participants",

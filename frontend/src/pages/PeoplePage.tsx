@@ -1,15 +1,21 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "../api";
 import Skeleton from "../components/Skeleton";
+import { haptic } from "../telegram";
 
 export default function PeoplePage() {
   const { t } = useTranslation();
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [params] = useSearchParams();
+  // Arrived from the "split evenly" fork: names are the only thing still
+  // missing, so this screen finishes the bill rather than handing off to a
+  // per-item screen nobody is going to touch.
+  const equalSplit = params.get("equal") === "1";
   const [names, setNames] = useState<string[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -40,6 +46,16 @@ export default function PeoplePage() {
     try {
       await api.bulkSetPeople(sessionId!, filled.map((name) => ({ name })));
       await queryClient.invalidateQueries({ queryKey: ["people", sessionId] });
+      if (equalSplit) {
+        // No assignments at all, and everything left unclaimed handed to
+        // everyone in equal parts — which, with nothing claimed, is the whole
+        // bill split evenly. Same server-side path the host-live screen
+        // offers when nobody picked anything.
+        await api.setHostAssignments(sessionId!, [], true);
+        haptic.success();
+        navigate(`/summary/${sessionId}`);
+        return;
+      }
       navigate(`/assign/${sessionId}`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t("people.failedSave"));
@@ -60,7 +76,9 @@ export default function PeoplePage() {
   return (
     <div className="page">
       <h1>{t("people.title")}</h1>
-      <p style={{ color: "var(--hint)", fontSize: 14 }}>{t("people.subtitle")}</p>
+      <p style={{ color: "var(--hint)", fontSize: 14 }}>
+        {equalSplit ? t("people.subtitleEqual") : t("people.subtitle")}
+      </p>
 
       {names.map((name, idx) => (
         <div className="row" key={idx}>
@@ -83,7 +101,11 @@ export default function PeoplePage() {
       {error && <p className="error">{error}</p>}
 
       <button className="btn" disabled={saving} onClick={handleNext}>
-        {saving ? t("people.saving") : t("people.next")}
+        {saving
+          ? t("people.saving")
+          : equalSplit
+            ? `⚖️ ${t("people.splitEqually")}`
+            : t("people.next")}
       </button>
     </div>
   );

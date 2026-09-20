@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { api, ItemOut, PersonOut, UnclaimedItem } from "../api";
 import Skeleton from "../components/Skeleton";
 import UnclaimedSheet from "../components/UnclaimedSheet";
+import ConfirmSheet from "../components/ConfirmSheet";
 import { fmtQty, MAX_QTY } from "../lib/format";
 import { storage } from "../lib/storage";
 import { haptic } from "../telegram";
@@ -32,6 +33,7 @@ export default function AssignPage() {
   const [activeItem, setActiveItem] = useState<ItemOut | null>(null);
   const [error, setError] = useState("");
   const [askUnclaimed, setAskUnclaimed] = useState(false);
+  const [askEqual, setAskEqual] = useState(false);
 
   const { data: session } = useQuery({
     queryKey: ["session", sessionId],
@@ -81,6 +83,18 @@ export default function AssignPage() {
     });
     storage.saveAssignments(sessionId!, byName);
   }, [sel, people, initialized, sessionId]);
+
+  // Everything to everyone, in equal parts: no assignments at all, and the
+  // whole bill left unclaimed for the server to share out.
+  const equalMutation = useMutation({
+    mutationFn: () => api.setHostAssignments(sessionId!, [], true),
+    onSuccess: () => {
+      storage.clearAssignments(sessionId!);
+      navigate(`/summary/${sessionId}`);
+    },
+    onError: (e: unknown) =>
+      setError(e instanceof Error ? e.message : t("assign.failedSave")),
+  });
 
   const saveMutation = useMutation({
     mutationFn: (splitUnclaimed: boolean) => {
@@ -222,6 +236,25 @@ export default function AssignPage() {
       >
         {saveMutation.isPending ? t("assign.calculating") : t("assign.calculate")}
       </button>
+
+      <button
+        className="btn-link"
+        disabled={equalMutation.isPending}
+        onClick={() => setAskEqual(true)}
+      >
+        ⚖️ {t("assign.splitEqually")}
+      </button>
+
+      {askEqual && (
+        <ConfirmSheet
+          title={t("assign.splitEqually")}
+          body={t("assign.splitEquallyBody")}
+          confirmLabel={t("assign.splitEquallyConfirm")}
+          busy={equalMutation.isPending}
+          onConfirm={() => equalMutation.mutate()}
+          onCancel={() => setAskEqual(false)}
+        />
+      )}
 
       {askUnclaimed && (
         <UnclaimedSheet

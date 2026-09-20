@@ -55,6 +55,8 @@ export default {
     needItem: "Kamida bitta mahsulot qo'shing (narxi bilan). Bu chek bo'lmasa, aniqroq rasm oling.",
   },
   mode: {
+    equal: "Hammaga teng bo'lish",
+    equalDesc: "Kim nima yegani muhim emas — chek hammaga baravar bo'linadi. Faqat ismlarni yozasiz.",
     title: "Qanday bo'lasiz?",
     collaborative: "Hammasi o'zi tanlaydi",
     collaborativeDesc: "Kod ulashing — har kim qo'shilib o'zi yegan taomni tanlaydi.",
@@ -62,6 +64,8 @@ export default {
     hostAssignsDesc: "Boshqalar ilovaga kirmaydi — siz ismlarni kiritib, kimga nima tegishli ekanini o'zingiz belgilaysiz.",
   },
   people: {
+    subtitleEqual: "Kimlar bo'lishayotganini yozing — chek ular orasida teng bo'linadi.",
+    splitEqually: "Teng bo'lish va yakunlash",
     title: "Ishtirokchilar",
     subtitle: "Hisobni kim bilan bo'lishayotganingizni kiriting.",
     addPerson: "+ Odam qo'shish",
@@ -72,6 +76,9 @@ export default {
     failedSave: "Saqlashda xato",
   },
   assign: {
+    splitEqually: "Hammaga teng bo'lish",
+    splitEquallyBody: "Butun chek barcha odamlarga baravar bo'linadi. Qo'lda belgilaganlaringiz o'chib ketadi.",
+    splitEquallyConfirm: "Ha, teng bo'lish",
     title: "Kimga nima tegishli?",
     subtitle: "Har bir mahsulotni bosib, kim yeganini belgilang.",
     editPeople: "Ishtirokchilarni tahrirlash",

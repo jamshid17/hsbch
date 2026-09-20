@@ -21,8 +21,12 @@ interface SessionBasic { currency: string; tax: string; tip: string; title?: str
 
 /** How the items get shared out — asked here, at the end of the edit, rather
  * than on a screen of its own: it is one question, and the host is already
- * looking at the very list it applies to. */
-type Mode = "collaborative" | "host_assigns";
+ * looking at the very list it applies to.
+ *
+ * "equal" is not a stored mode: splitting evenly is host_assigns with every
+ * item given to everyone, so it saves the same mode and only takes a shorter
+ * road to it — names, then done, with no per-item screen in between. */
+type Choice = "collaborative" | "host_assigns" | "equal";
 
 function emptyItem(): EditableItem {
   return { name: "", price: "", quantity: "1", unit: "pcs" };
@@ -190,7 +194,7 @@ export default function EditItemsPage() {
     tipMode === "pct" ? (subtotal * (parseFloat(tipPct) || 0)) / 100 : parseFloat(tip) || 0;
 
   const saveMutation = useMutation({
-    mutationFn: async (mode: Mode) => {
+    mutationFn: async (choice: Choice) => {
       // Sanitize: coerce blank price/qty to valid numbers (avoids the backend
       // decimal-parsing error) and drop empty junk rows (e.g. from scanning a
       // non-receipt photo).
@@ -213,15 +217,21 @@ export default function EditItemsPage() {
         tax: effectiveTax.toFixed(2),
         tip: effectiveTip.toFixed(2),
       });
-      await api.updateSession(sessionId!, { assignment_mode: mode });
-      return mode;
+      await api.updateSession(sessionId!, {
+        assignment_mode: choice === "collaborative" ? "collaborative" : "host_assigns",
+      });
+      return choice;
     },
     // Collaborative hosts land on the code screen, not on their own picks:
     // sharing is what the others are waiting for, and picking their own food
     // is one tap away from there.
-    onSuccess: (mode) => {
+    onSuccess: (choice) => {
       haptic.success();
-      navigate(mode === "collaborative" ? `/host/${sessionId}` : `/people/${sessionId}`);
+      if (choice === "collaborative") navigate(`/host/${sessionId}`);
+      // The people screen does the split itself when it knows that's all
+      // that's left to do.
+      else if (choice === "equal") navigate(`/people/${sessionId}?equal=1`);
+      else navigate(`/people/${sessionId}`);
     },
     onError: (e: unknown) => setError(e instanceof Error ? e.message : t("edit.failedSave")),
   });
@@ -371,6 +381,15 @@ export default function EditItemsPage() {
           : `✍️ ${t("mode.hostAssigns")}`}
       </button>
       <p className="fork-hint">{t("mode.hostAssignsDesc")}</p>
+
+      <button
+        className="btn btn-ghost"
+        disabled={saveMutation.isPending || items.length === 0}
+        onClick={() => saveMutation.mutate("equal")}
+      >
+        {pendingMode === "equal" ? t("edit.saving") : `⚖️ ${t("mode.equal")}`}
+      </button>
+      <p className="fork-hint">{t("mode.equalDesc")}</p>
     </div>
   );
 }
