@@ -1,5 +1,5 @@
 import uuid
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 
 from app.calculator import unclaimed_items
 from app.db import get_db
@@ -63,6 +63,23 @@ _code_lookups = SlidingWindowLimiter(limit=20, window_seconds=60)
 # grid. The calculator divides a line total by the ratio of claimed quantities,
 # so what matters is only that everyone's figure is the same.
 _QTY_STEP = Decimal("0.001")
+
+
+def _claim_capacity(quantity) -> Decimal | None:
+    """How many units of an item may be claimed in total, None for no cap.
+
+    Mirrors claimCapacity() in the frontend: an item with a count is a count,
+    and eight skewers claimed nine times describes a meal that didn't happen.
+    One unit or less is a dish rather than a count, and dishes get shared —
+    two people on one lagmon is what the proportional split is for.
+
+    The screens enforce this as you tap. Enforcing it here too is what makes
+    it a rule instead of a suggestion: the picks arrive over an API, and a
+    stale client racing another guest for the last portion is the ordinary
+    case, not a crafted one.
+    """
+    q = Decimal(str(quantity))
+    return q.to_integral_value(rounding=ROUND_DOWN) if q > 1 else None
 
 
 def _require_host(session: SessionModel, user: TelegramUser, action: str) -> None:
@@ -357,11 +374,31 @@ def update_my_assignments(
 
     person = _upsert_person(db, session_id, user)
 
-    valid_item_ids = set(
-        db.execute(
-            select(Item.id).where(Item.session_id == session_id)
+    items = {
+        i.id: i
+        for i in db.execute(
+            select(Item).where(Item.session_id == session_id)
         ).scalars().all()
-    )
+    }
+
+    # What everyone else is already holding, so a claim can't take more of a
+    # counted item than is left. Read before this person's rows are removed;
+    # their own claim is what is being replaced.
+    taken_by_others: dict[uuid.UUID, Decimal] = {}
+    if items:
+        for a in (
+            db.execute(
+                select(Assignment).where(
+                    Assignment.item_id.in_(items.keys()),
+                    Assignment.person_id != person.id,
+                )
+            )
+            .scalars()
+            .all()
+        ):
+            taken_by_others[a.item_id] = taken_by_others.get(
+                a.item_id, Decimal("0")
+            ) + Decimal(str(a.quantity))
 
     # Replace only this person's assignments.
     for a in (
@@ -373,16 +410,27 @@ def update_my_assignments(
 
     saved: list[PickOut] = []
     for pick in body.picks:
-        if pick.item_id not in valid_item_ids or pick.quantity <= 0:
+        item = items.get(pick.item_id)
+        if item is None or pick.quantity <= 0:
             continue
+        quantity = pick.quantity
+        capacity = _claim_capacity(item.quantity)
+        if capacity is not None:
+            # Clamped rather than refused: two guests reaching for the last
+            # portion at once is a race, not a mistake, and the response says
+            # what they actually got.
+            free = capacity - taken_by_others.get(pick.item_id, Decimal("0"))
+            if free <= 0:
+                continue
+            quantity = min(quantity, free)
         db.add(
             Assignment(
                 item_id=pick.item_id,
                 person_id=person.id,
-                quantity=pick.quantity,
+                quantity=quantity,
             )
         )
-        saved.append(PickOut(item_id=pick.item_id, quantity=pick.quantity))
+        saved.append(PickOut(item_id=pick.item_id, quantity=quantity))
 
     db.commit()
     manager.notify(str(session_id), {"type": "updated", "status": session.status})
@@ -404,31 +452,48 @@ def update_host_assignments(
         raise HTTPException(404, "Session not found")
     _require_host(session, user, "assign items")
 
-    valid_item_ids = set(
-        db.execute(select(Item.id).where(Item.session_id == session_id)).scalars().all()
-    )
+    items = {
+        i.id: i
+        for i in db.execute(
+            select(Item).where(Item.session_id == session_id)
+        ).scalars().all()
+    }
     valid_person_ids = set(
         db.execute(select(Person.id).where(Person.session_id == session_id)).scalars().all()
     )
 
-    if valid_item_ids:
+    if items:
         for a in (
-            db.execute(select(Assignment).where(Assignment.item_id.in_(valid_item_ids)))
+            db.execute(select(Assignment).where(Assignment.item_id.in_(items.keys())))
             .scalars()
             .all()
         ):
             db.delete(a)
 
+    # Running total per item, so the assignments in one request can't add up
+    # to more of a counted item than there is.
+    assigned: dict[uuid.UUID, Decimal] = {}
     for entry in body.assignments:
-        if entry.item_id not in valid_item_ids or entry.person_id not in valid_person_ids:
+        item = items.get(entry.item_id)
+        if item is None or entry.person_id not in valid_person_ids:
             continue
         if entry.quantity <= 0:
             continue
+        quantity = entry.quantity
+        capacity = _claim_capacity(item.quantity)
+        if capacity is not None:
+            free = capacity - assigned.get(entry.item_id, Decimal("0"))
+            if free <= 0:
+                continue
+            quantity = min(quantity, free)
+        assigned[entry.item_id] = (
+            assigned.get(entry.item_id, Decimal("0")) + quantity
+        )
         db.add(
             Assignment(
                 item_id=entry.item_id,
                 person_id=entry.person_id,
-                quantity=entry.quantity,
+                quantity=quantity,
             )
         )
 

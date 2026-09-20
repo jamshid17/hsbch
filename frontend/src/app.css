@@ -488,6 +488,12 @@ input:focus {
   border-bottom: none;
 }
 
+/* Nothing of this item is left to claim. */
+.item-taken {
+  color: var(--hint);
+  font-weight: 600;
+}
+
 /* A grant the person editing doesn't hold. Shown, because seeing it is what
    makes it legible as "not yours to give" rather than "doesn't exist". */
 .check-row-locked {

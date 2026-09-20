@@ -76,6 +76,8 @@ export default {
     failedSave: "Ошибка сохранения",
   },
   assign: {
+    unitsLeft: "Осталось {{left}} из {{total}}",
+    allUnitsTaken: "Все отмечены ({{total}})",
     splitEqually: "Разделить поровну",
     splitEquallyBody: "Весь счёт разделится поровну на всех. Всё, что вы отметили вручную, пропадёт.",
     splitEquallyConfirm: "Да, поровну",
@@ -100,6 +102,7 @@ export default {
     notFound: "Сессия с таким кодом не найдена",
   },
   pick: {
+    allTaken: "Всё разобрано",
     alsoTaken: "👥 Тоже взяли: {{names}}",
     title: "Что вы заказывали?",
     subtitle: "Нажмите на свои позиции. Для общих порций используйте − / +.",

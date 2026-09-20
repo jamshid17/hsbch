@@ -76,6 +76,8 @@ export default {
     failedSave: "Saqlashda xato",
   },
   assign: {
+    unitsLeft: "{{total}} tadan {{left}} tasi qoldi",
+    allUnitsTaken: "Hammasi belgilangan ({{total}} ta)",
     splitEqually: "Hammaga teng bo'lish",
     splitEquallyBody: "Butun chek barcha odamlarga baravar bo'linadi. Qo'lda belgilaganlaringiz o'chib ketadi.",
     splitEquallyConfirm: "Ha, teng bo'lish",
@@ -100,6 +102,7 @@ export default {
     notFound: "Bu code bo'yicha sessiya topilmadi",
   },
   pick: {
+    allTaken: "Hammasi olingan",
     alsoTaken: "👥 {{names}} ham oldi",
     title: "Siz nima yedingiz?",
     subtitle: "O'zingiz buyurtma qilgan taomlarni bosing. Umumiy porsiya uchun − / +.",

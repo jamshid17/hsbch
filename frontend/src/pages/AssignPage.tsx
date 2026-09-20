@@ -8,7 +8,7 @@ import { api, ItemOut, PersonOut, UnclaimedItem } from "../api";
 import Skeleton from "../components/Skeleton";
 import UnclaimedSheet from "../components/UnclaimedSheet";
 import ConfirmSheet from "../components/ConfirmSheet";
-import { fmtQty, MAX_QTY } from "../lib/format";
+import { claimCapacity, fmtQty, MAX_QTY } from "../lib/format";
 import { storage } from "../lib/storage";
 import { haptic } from "../telegram";
 
@@ -113,22 +113,44 @@ export default function AssignPage() {
       setError(e instanceof Error ? e.message : t("assign.failedSave")),
   });
 
+  /** How many units of an item are still unassigned, or Infinity when the
+   * item is a dish rather than a count (see claimCapacity). */
+  function freeUnits(item: ItemOut, byPerson: Record<string, number>): number {
+    const capacity = claimCapacity(item.quantity);
+    if (capacity === null) return Infinity;
+    const taken = Object.values(byPerson).reduce((sum, q) => sum + q, 0);
+    return capacity - taken;
+  }
+
   function togglePerson(itemId: string, personId: string) {
-    haptic.select();
+    const item = items?.find((i) => i.id === itemId);
     setSel((prev) => {
       const byPerson = { ...(prev[itemId] || {}) };
-      if (byPerson[personId]) delete byPerson[personId];
-      else byPerson[personId] = 1;
+      if (byPerson[personId]) {
+        delete byPerson[personId];
+      } else {
+        // Nothing left to hand out — the row is shown locked, and this is
+        // the keyboard path to the same refusal.
+        if (item && freeUnits(item, byPerson) < 1) return prev;
+        byPerson[personId] = 1;
+      }
       return { ...prev, [itemId]: byPerson };
     });
+    haptic.select();
   }
 
   function step(itemId: string, personId: string, delta: number, e: React.MouseEvent) {
     e.stopPropagation();
+    const item = items?.find((i) => i.id === itemId);
     setSel((prev) => {
       const byPerson = { ...(prev[itemId] || {}) };
       const cur = byPerson[personId] || 0;
-      byPerson[personId] = Math.min(MAX_QTY, Math.max(1, cur + delta));
+      // Their own share plus whatever nobody has taken yet: eight skewers
+      // stay eight however they are divided up.
+      const ceiling = item
+        ? Math.min(MAX_QTY, cur + freeUnits(item, byPerson))
+        : MAX_QTY;
+      byPerson[personId] = Math.min(ceiling, Math.max(1, cur + delta));
       return { ...prev, [itemId]: byPerson };
     });
   }
@@ -291,47 +313,74 @@ export default function AssignPage() {
               <p style={{ color: "var(--hint)", fontSize: 13, marginTop: -4 }}>
                 {t("assign.sheetSubtitle")}
               </p>
-              {people?.map((person) => {
-                const qty = sel[activeItem.id]?.[person.id] || 0;
-                const checked = qty > 0;
-                const multi = parseFloat(activeItem.quantity) > 1;
+              {(() => {
+                const capacity = claimCapacity(activeItem.quantity);
+                const free = freeUnits(activeItem, sel[activeItem.id] || {});
                 return (
-                  <div
-                    key={person.id}
-                    className="check-row"
-                    role="button"
-                    tabIndex={0}
-                    aria-pressed={checked}
-                    onClick={() => togglePerson(activeItem.id, person.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        togglePerson(activeItem.id, person.id);
-                      }
-                    }}
-                  >
-                    <div className={clsx("checkmark", { checked })}>{checked && "✓"}</div>
-                    <span style={{ fontSize: 16, flex: 1 }}>{person.name}</span>
-                    {checked && multi && (
-                      <div className="qty-stepper" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={(e) => step(activeItem.id, person.id, -1, e)}
-                          disabled={qty <= 1}
-                        >
-                          −
-                        </button>
-                        <span>{qty}</span>
-                        <button
-                          onClick={(e) => step(activeItem.id, person.id, 1, e)}
-                          disabled={qty >= MAX_QTY}
-                        >
-                          +
-                        </button>
-                      </div>
+                  <>
+                    {/* A count that is running out is worth saying before the
+                        rows start refusing to tick. */}
+                    {capacity !== null && (
+                      <p className="muted-line">
+                        {free > 0
+                          ? t("assign.unitsLeft", { left: free, total: capacity })
+                          : t("assign.allUnitsTaken", { total: capacity })}
+                      </p>
                     )}
-                  </div>
+
+                    {people?.map((person) => {
+                      const qty = sel[activeItem.id]?.[person.id] || 0;
+                      const checked = qty > 0;
+                      const multi = parseFloat(activeItem.quantity) > 1;
+                      // Everything is spoken for and this person has none of
+                      // it: there is nothing left to give them.
+                      const locked = !checked && free < 1;
+                      return (
+                        <div
+                          key={person.id}
+                          className={clsx("check-row", { "check-row-locked": locked })}
+                          role="button"
+                          tabIndex={locked ? -1 : 0}
+                          aria-pressed={checked}
+                          aria-disabled={locked}
+                          onClick={() => togglePerson(activeItem.id, person.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              togglePerson(activeItem.id, person.id);
+                            }
+                          }}
+                        >
+                          <div className={clsx("checkmark", { checked })}>
+                            {checked && "✓"}
+                          </div>
+                          <span style={{ fontSize: 16, flex: 1 }}>{person.name}</span>
+                          {checked && multi && (
+                            <div
+                              className="qty-stepper"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                onClick={(e) => step(activeItem.id, person.id, -1, e)}
+                                disabled={qty <= 1}
+                              >
+                                −
+                              </button>
+                              <span>{qty}</span>
+                              <button
+                                onClick={(e) => step(activeItem.id, person.id, 1, e)}
+                                disabled={free < 1 || qty >= MAX_QTY}
+                              >
+                                +
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </>
                 );
-              })}
+              })()}
               <button className="btn" style={{ marginTop: 8 }} onClick={() => setActiveItem(null)}>
                 {t("assign.done")}
               </button>

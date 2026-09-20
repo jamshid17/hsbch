@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 import { api, ItemOut, ParticipantOut } from "../api";
 import { getTelegramUser, haptic } from "../telegram";
-import { fmtQty, MAX_QTY } from "../lib/format";
+import { claimCapacity, fmtQty, MAX_QTY } from "../lib/format";
 import { useSessionSocket } from "../lib/useSessionSocket";
 import Skeleton from "../components/Skeleton";
 
@@ -104,24 +104,35 @@ export default function PickPage() {
     return sum;
   }, [items, sel, othersQty]);
 
-  function toggle(itemId: string) {
+  /** The most of this item I can still claim: whatever the others have left
+   * of a counted item, or no limit at all for a dish being shared. */
+  function myCeiling(item: ItemOut): number {
+    const capacity = claimCapacity(item.quantity);
+    if (capacity === null) return MAX_QTY;
+    return Math.min(MAX_QTY, capacity - (othersQty[item.id] || 0));
+  }
+
+  function toggle(item: ItemOut) {
+    // Nothing left of it — the card is shown as taken, and this is the
+    // keyboard path to the same refusal.
+    if (!sel[item.id] && myCeiling(item) < 1) return;
     haptic.select();
     setSaved(false);
     setSel((prev) => {
       const next = { ...prev };
-      if (next[itemId]) delete next[itemId];
-      else next[itemId] = 1;
+      if (next[item.id]) delete next[item.id];
+      else next[item.id] = 1;
       return next;
     });
   }
 
-  function step(itemId: string, delta: number, e: React.MouseEvent) {
+  function step(item: ItemOut, delta: number, e: React.MouseEvent) {
     e.stopPropagation();
     setSaved(false);
     setSel((prev) => {
-      const cur = prev[itemId] || 0;
-      const nextQty = Math.min(MAX_QTY, Math.max(1, cur + delta));
-      return { ...prev, [itemId]: nextQty };
+      const cur = prev[item.id] || 0;
+      const nextQty = Math.min(myCeiling(item), Math.max(1, cur + delta));
+      return { ...prev, [item.id]: nextQty };
     });
   }
 
@@ -167,22 +178,29 @@ export default function PickPage() {
         const qty = sel[item.id] || 0;
         const multi = parseFloat(item.quantity) > 1;
         const others = othersByItem[item.id] ?? [];
+        const ceiling = myCeiling(item);
+        // Everyone else has taken the lot and I have none of it.
+        const taken = !selected && ceiling < 1;
         return (
           <motion.div
             key={item.id}
-            className={clsx("card", "tappable", { "card-selected": selected })}
+            className={clsx("card", "tappable", {
+              "card-selected": selected,
+              "check-row-locked": taken,
+            })}
             style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
             role="button"
-            tabIndex={0}
+            tabIndex={taken ? -1 : 0}
             aria-pressed={selected}
-            onClick={() => toggle(item.id)}
+            aria-disabled={taken}
+            onClick={() => toggle(item)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                toggle(item.id);
+                toggle(item);
               }
             }}
-            whileTap={{ scale: 0.98 }}
+            whileTap={{ scale: taken ? 1 : 0.98 }}
           >
             <div className={clsx("checkmark", { checked: selected })}>
               {selected && "✓"}
@@ -198,12 +216,15 @@ export default function PickPage() {
                   {t("pick.alsoTaken", { names: others.join(", ") })}
                 </div>
               )}
+              {taken && (
+                <div className="item-others item-taken">{t("pick.allTaken")}</div>
+              )}
             </div>
             {selected && multi && (
               <div className="qty-stepper" onClick={(e) => e.stopPropagation()}>
-                <button onClick={(e) => step(item.id, -1, e)} disabled={qty <= 1}>−</button>
+                <button onClick={(e) => step(item, -1, e)} disabled={qty <= 1}>−</button>
                 <span>{qty}</span>
-                <button onClick={(e) => step(item.id, 1, e)} disabled={qty >= MAX_QTY}>+</button>
+                <button onClick={(e) => step(item, 1, e)} disabled={qty >= ceiling}>+</button>
               </div>
             )}
           </motion.div>

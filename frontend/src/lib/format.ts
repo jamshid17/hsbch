@@ -8,6 +8,21 @@ export function fmtQty(value: string | number): string {
   return String(Number(n.toFixed(3)));
 }
 
+/**
+ * How many units of an item can be claimed in total, or null for no limit.
+ *
+ * An item with a count is a count: eight skewers are eight, and a ninth
+ * being claimed makes the split describe a meal that didn't happen. One unit
+ * or less is a dish rather than a count, and dishes get shared — two people
+ * ticking one lagmon is what the proportional split is for — so those stay
+ * uncapped.
+ */
+export function claimCapacity(quantity: string | number): number | null {
+  const n = typeof quantity === "string" ? parseFloat(quantity) : quantity;
+  if (!isFinite(n) || n <= 1) return null;
+  return Math.floor(n);
+}
+
 /** Clamp a quantity to the 0..MAX_QTY range (empty string passes through). */
 export function clampQty(value: string): string {
   if (value === "") return value;

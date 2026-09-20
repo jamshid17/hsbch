@@ -76,6 +76,8 @@ export default {
     failedSave: "Failed to save",
   },
   assign: {
+    unitsLeft: "{{left}} of {{total}} left",
+    allUnitsTaken: "All {{total}} assigned",
     splitEqually: "Split evenly",
     splitEquallyBody: "The whole bill splits equally between everyone. Anything you assigned by hand is discarded.",
     splitEquallyConfirm: "Yes, split evenly",
@@ -100,6 +102,7 @@ export default {
     notFound: "No session found for that code",
   },
   pick: {
+    allTaken: "All taken",
     alsoTaken: "👥 Also taken by {{names}}",
     title: "What did you have?",
     subtitle: "Tap the items you ordered. Use − / + for shared portions.",
