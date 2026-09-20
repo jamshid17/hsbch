@@ -227,3 +227,76 @@ def test_total_is_always_subtotal_plus_extras(tax, tip):
 
     for r in result:
         assert r["total"] == r["subtotal"] + r["extras"]
+
+
+# ── Nothing invented, nothing lost ───────────────────────────────────────
+
+
+def claimed_total(items):
+    return sum(
+        (i.price * i.quantity).quantize(Decimal("0.01")) for i in items
+    )
+
+
+def test_the_totals_add_up_to_the_receipt_when_shares_do_not_divide():
+    """Three people over 256 457 each owe 85 485.666…
+
+    Rounding those three on their own gives a cent more than the receipt —
+    the app's own arithmetic disagreeing with the paper on the table. Every
+    division goes through _allocate now, so it can't.
+    """
+    people = [person("A"), person("B"), person("C")]
+    dishes = [item("Katta taom", "256457")]
+    claims = [claim(dishes[0], p) for p in people]
+
+    result = calculate_summary(session(), dishes, people, claims)
+
+    assert sum(r["total"] for r in result) == Decimal("256457.00")
+
+
+def test_a_persons_items_add_up_to_their_own_subtotal():
+    """The breakdown is what the person checks the number against; a line
+    that doesn't sum to the figure above it is worse than no breakdown."""
+    people = [person("A"), person("B"), person("C")]
+    dishes = [item("Bir", "100000"), item("Ikki", "123457"), item("Uch", "9000")]
+    claims = [claim(d, p) for d in dishes for p in people]
+
+    result = calculate_summary(session(tip="777.77"), dishes, people, claims)
+
+    for r in result:
+        assert sum(i["share"] for i in r["items"]) == r["subtotal"]
+        assert r["subtotal"] + r["extras"] == r["total"]
+
+
+def test_an_even_split_is_even_to_within_a_cent_or_two():
+    """Spare cents can't be halved, so somebody gets them — but the same
+    person must not collect every one. Before the running tally, four items
+    left the first person four cents above everyone else, on the one split
+    whose whole promise is that the numbers match.
+    """
+    people = [person("A"), person("B"), person("C")]
+    # Four line totals, two of which divide unevenly by three.
+    dishes = [
+        item("Bir", "100000"),
+        item("Ikki", "9000"),
+        item("Uch", "6000"),
+        item("To'rt", "123457"),
+    ]
+    claims = [claim(d, p) for d in dishes for p in people]
+
+    result = calculate_summary(session(tax="12345.67", tip="10000"), dishes, people, claims)
+
+    totals = [r["total"] for r in result]
+    assert max(totals) - min(totals) <= Decimal("0.02")
+    assert sum(totals) == claimed_total(dishes) + Decimal("22345.67")
+
+
+@pytest.mark.parametrize("headcount", [2, 3, 4, 5, 6, 7])
+def test_an_even_split_never_invents_or_loses_money(headcount):
+    people = [person(f"P{i}") for i in range(headcount)]
+    dishes = [item("Bir", "123457"), item("Ikki", "99999.99"), item("Uch", "7")]
+    claims = [claim(d, p) for d in dishes for p in people]
+
+    result = calculate_summary(session(tax="1234.56", tip="99.99"), dishes, people, claims)
+
+    assert sum(r["total"] for r in result) == claimed_total(dishes) + Decimal("1334.55")
