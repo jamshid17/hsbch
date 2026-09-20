@@ -50,6 +50,31 @@ def _extract_json(raw: str) -> str:
     return text
 
 
+NOT_A_RECEIPT = (
+    "Bu chek emasga o'xshaydi. Chekning o'zini suratga olib, qayta urinib "
+    "ko'ring."
+)
+
+
+def _reject_if_not_a_receipt(result: ScanResult) -> None:
+    """Refuse a scan that didn't find a bill.
+
+    Two ways of not being one. The model says so outright — the prompt gives
+    it that answer precisely so it doesn't have to invent line items to fill
+    the shape it was asked for. Or it says nothing useful: a reply with no
+    priced item is a receipt only in shape, and handing it on means the
+    person finds out two screens later, at the edit page's "add at least one
+    item", by which point they have no idea which photo was the problem.
+
+    Raising here also gives the free scan back — the caller releases the slot
+    for any ReceiptScanError — so a photo of a cat costs nothing.
+    """
+    if not result.is_receipt:
+        raise ReceiptScanError(NOT_A_RECEIPT, code="scan.not_a_receipt")
+    if not any(item.price > 0 for item in result.items):
+        raise ReceiptScanError(NOT_A_RECEIPT, code="scan.not_a_receipt")
+
+
 async def scan_receipt(image_bytes: bytes, media_type: str) -> ScanResult:
     media_type = (media_type or "").lower()
     if media_type == "image/jpg":
@@ -117,9 +142,12 @@ async def scan_receipt(image_bytes: bytes, media_type: str) -> ScanResult:
 
     try:
         data = json.loads(_extract_json(raw))
-        return ScanResult(**data)
+        result = ScanResult(**data)
     except (json.JSONDecodeError, TypeError, ValueError) as e:
         logger.exception("Failed to parse scan result. Raw head: %s", raw[:500])
         raise ReceiptScanError(
             f"AI javobini o'qib bo'lmadi: {e}", code="scan.unreadable"
         ) from e
+
+    _reject_if_not_a_receipt(result)
+    return result

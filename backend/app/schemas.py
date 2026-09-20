@@ -190,6 +190,10 @@ class ScannedItem(BaseModel):
 
 
 class ScanResult(BaseModel):
+    # The model's own verdict on whether it was looking at a receipt at all.
+    # Defaults true so a reply that omits it is read the way replies were
+    # read before the question was asked.
+    is_receipt: bool = True
     title: str = "Receipt"
     currency: str
     tax: Decimal

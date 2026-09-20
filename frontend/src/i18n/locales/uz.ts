@@ -171,6 +171,7 @@ export default {
       exhausted: "Bepul {{free}} ta skan tugadi. Davom etish uchun {{days}} kunlik obuna kerak.",
     },
     scan: {
+      not_a_receipt: "Bu chek emasga o'xshaydi. Chekning o'zini suratga olib, qayta urinib ko'ring.",
       unsupported_format: "Bu rasm formati ({{format}}) qo'llab-quvvatlanmaydi. JPEG yoki PNG yuklang.",
       ai_error: "Skanerlash xizmatida xatolik ({{status}}). Birozdan keyin urinib ko'ring.",
       ai_unreachable: "Skanerlash xizmatiga ulanib bo'lmadi. Keyinroq urinib ko'ring.",

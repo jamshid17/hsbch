@@ -20,6 +20,9 @@ export default function ScanPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [quotaExceeded, setQuotaExceeded] = useState(false);
+  // "That is not a receipt" is the user's to fix, not a fault — it reads
+  // as a warning next to the photo rather than as something broken.
+  const [notReceipt, setNotReceipt] = useState(false);
 
   const { data: me } = useQuery({
     queryKey: ["me"],
@@ -38,6 +41,7 @@ export default function ScanPage() {
     // is uploaded and no session is created for a file that can never scan.
     if (!isAcceptedImage(f)) {
       setPreview(null);
+      setNotReceipt(false);
       setError(t("scan.notAnImage"));
       return;
     }
@@ -49,6 +53,7 @@ export default function ScanPage() {
     });
     setError("");
     setQuotaExceeded(false);
+    setNotReceipt(false);
     // Picking the photo is the decision; there was never a second one to make
     // on this screen, so scanning starts on the same tap.
     scan(f);
@@ -58,6 +63,7 @@ export default function ScanPage() {
     setLoading(true);
     setError("");
     setQuotaExceeded(false);
+    setNotReceipt(false);
     try {
       // Compress before the session exists: a photo that can't be shrunk under
       // the limit shouldn't leave an empty session behind.
@@ -72,6 +78,9 @@ export default function ScanPage() {
         setError(t("scan.tooLarge"));
       } else if (e instanceof ApiError && e.status === 402) {
         setQuotaExceeded(true);
+        setError(e.message);
+      } else if (e instanceof ApiError && e.code === "scan.not_a_receipt") {
+        setNotReceipt(true);
         setError(e.message);
       } else if (e instanceof ApiError && (e.status === 413 || e.status === 415)) {
         setError(e.message);
@@ -155,7 +164,12 @@ export default function ScanPage() {
         </div>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {error &&
+        (notReceipt ? (
+          <p className="notice notice-warn">⚠️ {error}</p>
+        ) : (
+          <p className="error">{error}</p>
+        ))}
       {quotaExceeded && me && me.subscriptions_enabled && !me.is_subscribed && (
         <Paywall me={me} />
       )}

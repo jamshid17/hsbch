@@ -170,6 +170,7 @@ export default {
       exhausted: "Your {{free}} free scans are used up. A {{days}}-day subscription continues.",
     },
     scan: {
+      not_a_receipt: "That doesn't look like a receipt. Photograph the receipt itself and try again.",
       unsupported_format: "That image format ({{format}}) isn't supported. Upload a JPEG or PNG.",
       ai_error: "The scanning service returned an error ({{status}}). Try again shortly.",
       ai_unreachable: "Couldn't reach the scanning service. Try again later.",
