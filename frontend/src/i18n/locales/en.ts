@@ -153,6 +153,39 @@ export default {
     people_other: "{{count}} people",
     open: "still open",
   },
+  // What the API says when something goes wrong, keyed by the code it sends
+  // (see backend/app/errors.py). The server sends its own sentence too, so a
+  // code missing here still reads as words — but in Uzbek, which is the whole
+  // reason these exist.
+  errors: {
+    upload: {
+      not_an_image: "Please upload a receipt photo only (JPG, PNG, WEBP). PDFs and other files aren't accepted.",
+      empty: "An empty file was sent.",
+      too_large: "That photo is too large ({{mb}} MB). The limit is {{max}} MB.",
+    },
+    quota: {
+      exhausted: "Your {{free}} free scans are used up. A {{days}}-day subscription continues.",
+    },
+    scan: {
+      unsupported_format: "That image format ({{format}}) isn't supported. Upload a JPEG or PNG.",
+      ai_error: "The scanning service returned an error ({{status}}). Try again shortly.",
+      ai_unreachable: "Couldn't reach the scanning service. Try again later.",
+      refused: "That photo couldn't be processed. Try a different one.",
+      no_text: "No text was found on the receipt. Try a clearer photo.",
+      too_long: "The receipt is too long to read in full.",
+      unreadable: "Couldn't read the receipt. Try a clearer photo.",
+      unexpected: "Something unexpected went wrong. Try again shortly.",
+    },
+    image: {
+      bad_format: "Only PNG or JPEG can be sent.",
+      too_large: "That image is too large.",
+      send_failed: "Couldn't send the picture to the bot. Send it /start first.",
+    },
+    account: {
+      blocked: "Your account is blocked.",
+      blocked_reason: "Your account is blocked. Reason: {{reason}}",
+    },
+  },
   summary: {
     markPaid: "Mark {{name}} as paid",
     markUnpaid: "Mark {{name}} as not paid",

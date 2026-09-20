@@ -154,6 +154,39 @@ export default {
     people_other: "{{count}} kishi",
     open: "davom etmoqda",
   },
+  // What the API says when something goes wrong, keyed by the code it sends
+  // (see backend/app/errors.py). The server sends its own sentence too, so a
+  // code missing here still reads as words — but in Uzbek, which is the whole
+  // reason these exist.
+  errors: {
+    upload: {
+      not_an_image: "Faqat chek rasmini yuklang (JPG, PNG, WEBP). PDF va boshqa fayllar qabul qilinmaydi.",
+      empty: "Bo'sh fayl yuborildi.",
+      too_large: "Rasm juda katta ({{mb}} MB). Eng ko'pi {{max}} MB.",
+    },
+    quota: {
+      exhausted: "Bepul {{free}} ta skan tugadi. Davom etish uchun {{days}} kunlik obuna kerak.",
+    },
+    scan: {
+      unsupported_format: "Bu rasm formati ({{format}}) qo'llab-quvvatlanmaydi. JPEG yoki PNG yuklang.",
+      ai_error: "Skanerlash xizmatida xatolik ({{status}}). Birozdan keyin urinib ko'ring.",
+      ai_unreachable: "Skanerlash xizmatiga ulanib bo'lmadi. Keyinroq urinib ko'ring.",
+      refused: "Bu rasmni qayta ishlab bo'lmadi. Boshqa rasm bilan urinib ko'ring.",
+      no_text: "Chekdan matn topilmadi. Aniqroq rasm oling.",
+      too_long: "Chek juda uzun — to'liq o'qib bo'lmadi.",
+      unreadable: "Chekni o'qib bo'lmadi. Aniqroq rasm bilan urinib ko'ring.",
+      unexpected: "Kutilmagan xato. Birozdan keyin urinib ko'ring.",
+    },
+    image: {
+      bad_format: "Faqat PNG yoki JPEG yuborish mumkin.",
+      too_large: "Rasm juda katta.",
+      send_failed: "Rasmni botga yuborib bo'lmadi. Avval botga /start yuboring.",
+    },
+    account: {
+      blocked: "Hisobingiz bloklangan.",
+      blocked_reason: "Hisobingiz bloklangan. Sabab: {{reason}}",
+    },
+  },
   summary: {
     markPaid: "{{name}} to'ladi deb belgilash",
     markUnpaid: "{{name}} ning to'lovini bekor qilish",

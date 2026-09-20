@@ -4,6 +4,7 @@ from datetime import datetime
 
 from app.config import settings
 from app.db import get_db
+from app.errors import api_error
 from app.models import BotUser, Item, ReceiptScan
 from app.models import Session as SessionModel
 from app.schemas import ScanResult
@@ -120,16 +121,18 @@ def _reject_non_image(file: UploadFile) -> None:
     """
     media_type = (file.content_type or "").split(";")[0].strip().lower()
     if media_type and media_type not in ALLOWED_UPLOAD_TYPES:
-        raise HTTPException(
+        raise api_error(
             415,
+            "upload.not_an_image",
             "Faqat rasm yuklash mumkin (JPEG, PNG, WEBP). "
             "PDF va boshqa fayllar qo'llab-quvvatlanmaydi.",
         )
 
     name = (file.filename or "").lower()
     if "." in name and not name.endswith(ALLOWED_UPLOAD_EXTENSIONS):
-        raise HTTPException(
+        raise api_error(
             415,
+            "upload.not_an_image",
             "Faqat rasm yuklash mumkin (JPEG, PNG, WEBP). "
             "PDF va boshqa fayllar qo'llab-quvvatlanmaydi.",
         )
@@ -150,19 +153,26 @@ async def upload_receipt(
 
     image_bytes = await file.read()
     if not image_bytes:
-        raise HTTPException(400, "Bo'sh fayl yuborildi.")
+        raise api_error(400, "upload.empty", "Bo'sh fayl yuborildi.")
     if len(image_bytes) > settings.max_upload_bytes:
-        raise HTTPException(
+        size_mb = len(image_bytes) / 1024 / 1024
+        raise api_error(
             413,
-            f"Rasm juda katta ({len(image_bytes) / 1024 / 1024:.1f} MB). "
+            "upload.too_large",
+            f"Rasm juda katta ({size_mb:.1f} MB). "
             f"Eng ko'pi {settings.max_upload_mb} MB.",
+            mb=f"{size_mb:.1f}",
+            max=settings.max_upload_mb,
         )
 
     if not _claim_scan_slot(db, tg_user.id):
-        raise HTTPException(
+        raise api_error(
             402,
+            "quota.exhausted",
             f"Bepul {settings.free_total_scans} ta skan tugadi. "
             f"Davom etish uchun {settings.subscription_days} kunlik obuna kerak.",
+            free=settings.free_total_scans,
+            days=settings.subscription_days,
         )
 
     try:
@@ -170,11 +180,11 @@ async def upload_receipt(
     except ReceiptScanError as e:
         # Expected, user-facing failure (bad format, AI error, unparseable reply)
         _release_scan_slot(db, tg_user.id)
-        raise HTTPException(422, str(e))
+        raise api_error(422, e.code, str(e), **e.params)
     except Exception as e:  # noqa: BLE001 - surface the real cause to the client
         logger.exception("Unexpected error while scanning receipt")
         _release_scan_slot(db, tg_user.id)
-        raise HTTPException(500, f"Kutilmagan xato: {e}")
+        raise api_error(500, "scan.unexpected", f"Kutilmagan xato: {e}")
 
     _log_scan(db, tg_user.id, session_id)
 

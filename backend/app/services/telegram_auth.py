@@ -17,6 +17,7 @@ from fastapi import Depends, Header, HTTPException
 
 from app.config import settings
 from app.db import get_db
+from app.errors import api_error
 from app.models import BotUser
 from sqlalchemy.orm import Session
 
@@ -201,10 +202,14 @@ def _reject_if_blocked(db: Session, user: TelegramUser) -> TelegramUser:
     """
     row = db.get(BotUser, user.id)
     if row is not None and row.blocked_at is not None:
-        detail = BLOCKED_MESSAGE
         if row.block_reason:
-            detail = f"{detail} Sabab: {row.block_reason}"
-        raise HTTPException(403, detail)
+            raise api_error(
+                403,
+                "account.blocked_reason",
+                f"{BLOCKED_MESSAGE} Sabab: {row.block_reason}",
+                reason=row.block_reason,
+            )
+        raise api_error(403, "account.blocked", BLOCKED_MESSAGE)
     return user
 
 

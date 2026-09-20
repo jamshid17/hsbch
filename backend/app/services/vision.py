@@ -17,7 +17,16 @@ SUPPORTED_MEDIA_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
 
 class ReceiptScanError(Exception):
-    """Receipt could not be scanned. The message is safe to show to the user."""
+    """Receipt could not be scanned. The message is safe to show to the user.
+
+    `code` and `params` travel with it so the router can hand the client
+    something it can say in the reader's own language (see app/errors.py).
+    """
+
+    def __init__(self, message: str, code: str, **params):
+        super().__init__(message)
+        self.code = code
+        self.params = params
 
 
 def _extract_json(raw: str) -> str:
@@ -48,7 +57,9 @@ async def scan_receipt(image_bytes: bytes, media_type: str) -> ScanResult:
     if media_type not in SUPPORTED_MEDIA_TYPES:
         raise ReceiptScanError(
             f"Rasm formati qo'llab-quvvatlanmaydi: '{media_type or 'nomaʼlum'}'. "
-            "Iltimos JPEG yoki PNG rasm yuklang."
+            "Iltimos JPEG yoki PNG rasm yuklang.",
+            code="scan.unsupported_format",
+            format=media_type or "?",
         )
 
     encoded = base64.standard_b64encode(image_bytes).decode()
@@ -77,29 +88,38 @@ async def scan_receipt(image_bytes: bytes, media_type: str) -> ScanResult:
     except anthropic.APIStatusError as e:
         logger.exception("Anthropic API error during receipt scan")
         raise ReceiptScanError(
-            f"AI xizmati xatosi ({e.status_code}): {e.message}"
+            f"AI xizmati xatosi ({e.status_code}): {e.message}",
+            code="scan.ai_error",
+            status=e.status_code,
         ) from e
     except anthropic.APIConnectionError as e:
         logger.exception("Anthropic connection error during receipt scan")
         raise ReceiptScanError(
-            "AI xizmatiga ulanib bo'lmadi. Keyinroq qayta urinib ko'ring."
+            "AI xizmatiga ulanib bo'lmadi. Keyinroq qayta urinib ko'ring.",
+            code="scan.ai_unreachable",
         ) from e
 
     if message.stop_reason == "refusal":
-        raise ReceiptScanError("AI rasmni qayta ishlashdan bosh tortdi.")
+        raise ReceiptScanError(
+            "AI rasmni qayta ishlashdan bosh tortdi.", code="scan.refused"
+        )
 
     raw = next((b.text for b in message.content if b.type == "text"), None)
     if not raw:
         logger.error("No text block in Anthropic response: %r", message.content)
-        raise ReceiptScanError("AI javobida matn topilmadi.")
+        raise ReceiptScanError("AI javobida matn topilmadi.", code="scan.no_text")
 
     if message.stop_reason == "max_tokens":
         logger.error("Receipt scan truncated (max_tokens). Raw head: %s", raw[:500])
-        raise ReceiptScanError("Chek juda uzun — to'liq o'qib bo'lmadi.")
+        raise ReceiptScanError(
+            "Chek juda uzun — to'liq o'qib bo'lmadi.", code="scan.too_long"
+        )
 
     try:
         data = json.loads(_extract_json(raw))
         return ScanResult(**data)
     except (json.JSONDecodeError, TypeError, ValueError) as e:
         logger.exception("Failed to parse scan result. Raw head: %s", raw[:500])
-        raise ReceiptScanError(f"AI javobini o'qib bo'lmadi: {e}") from e
+        raise ReceiptScanError(
+            f"AI javobini o'qib bo'lmadi: {e}", code="scan.unreadable"
+        ) from e

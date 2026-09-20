@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from app.calculator import calculate_summary, unclaimed_items
 from app.db import get_db
+from app.errors import api_error
 from app.models import Assignment, Item, Person
 from app.models import Session as SessionModel
 from app.schemas import SummaryOut, UnclaimedItem
@@ -108,13 +109,15 @@ async def send_summary_image(
 
     media_type = (file.content_type or "").split(";")[0].strip().lower()
     if media_type and media_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(415, "Faqat PNG yoki JPEG rasm yuborish mumkin.")
+        raise api_error(
+            415, "image.bad_format", "Faqat PNG yoki JPEG rasm yuborish mumkin."
+        )
 
     image_bytes = await file.read()
     if not image_bytes:
-        raise HTTPException(400, "Bo'sh fayl yuborildi.")
+        raise api_error(400, "upload.empty", "Bo'sh fayl yuborildi.")
     if len(image_bytes) > MAX_IMAGE_BYTES:
-        raise HTTPException(413, "Rasm juda katta.")
+        raise api_error(413, "image.too_large", "Rasm juda katta.")
 
     # Imported here, not at module scope: importing app.bot builds the Bot
     # instance, and the rest of the API must keep starting without a token.
@@ -156,7 +159,9 @@ async def send_summary_image(
         # Most often: the user never pressed /start, so the bot may not write
         # to them. 409 tells the Mini App to fall back to saving the image.
         logger.warning("summary image send failed for %s: %s", tg_user.id, e)
-        raise HTTPException(409, "Rasmni botga yuborib bo'lmadi.")
+        raise api_error(
+            409, "image.send_failed", "Rasmni botga yuborib bo'lmadi."
+        )
 
     if message.photo:
         session.summary_image_file_id = message.photo[-1].file_id

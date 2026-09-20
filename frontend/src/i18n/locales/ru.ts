@@ -160,6 +160,39 @@ export default {
     people_many: "{{count}} человек",
     open: "не завершён",
   },
+  // What the API says when something goes wrong, keyed by the code it sends
+  // (see backend/app/errors.py). The server sends its own sentence too, so a
+  // code missing here still reads as words — but in Uzbek, which is the whole
+  // reason these exist.
+  errors: {
+    upload: {
+      not_an_image: "Загрузите только фото чека (JPG, PNG, WEBP). PDF и другие файлы не принимаются.",
+      empty: "Отправлен пустой файл.",
+      too_large: "Фото слишком большое ({{mb}} МБ). Максимум {{max}} МБ.",
+    },
+    quota: {
+      exhausted: "Бесплатные сканы закончились ({{free}}). Для продолжения нужна подписка на {{days}} дней.",
+    },
+    scan: {
+      unsupported_format: "Этот формат ({{format}}) не поддерживается. Загрузите JPEG или PNG.",
+      ai_error: "Ошибка сервиса распознавания ({{status}}). Попробуйте чуть позже.",
+      ai_unreachable: "Не удалось связаться с сервисом распознавания. Попробуйте позже.",
+      refused: "Это фото не удалось обработать. Попробуйте другое.",
+      no_text: "На чеке не найден текст. Сделайте фото чётче.",
+      too_long: "Чек слишком длинный — не удалось прочитать целиком.",
+      unreadable: "Не удалось прочитать чек. Попробуйте фото почётче.",
+      unexpected: "Непредвиденная ошибка. Попробуйте чуть позже.",
+    },
+    image: {
+      bad_format: "Можно отправить только PNG или JPEG.",
+      too_large: "Картинка слишком большая.",
+      send_failed: "Не удалось отправить картинку боту. Сначала напишите боту /start.",
+    },
+    account: {
+      blocked: "Ваш аккаунт заблокирован.",
+      blocked_reason: "Ваш аккаунт заблокирован. Причина: {{reason}}",
+    },
+  },
   summary: {
     markPaid: "Отметить, что {{name}} заплатил",
     markUnpaid: "Снять отметку об оплате у {{name}}",
