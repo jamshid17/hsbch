@@ -5,10 +5,19 @@ export class ApiError extends Error {
   /** Machine-readable name for the failure, when the server sent one.
    * `message` is already translated; this is for branching on. */
   code?: string;
-  constructor(message: string, status: number, code?: string) {
+  /** The values the server filled the sentence with, for a screen that
+   * needs one of them on its own — the admin to contact, say. */
+  params: Record<string, unknown>;
+  constructor(
+    message: string,
+    status: number,
+    code?: string,
+    params: Record<string, unknown> = {},
+  ) {
     super(message);
     this.status = status;
     this.code = code;
+    this.params = params;
   }
 }
 
@@ -44,6 +53,7 @@ export async function apiError(res: Response): Promise<ApiError> {
   const text = await res.text().catch(() => "");
   let message = readable(text, res.status);
   let code: string | undefined;
+  let params: Record<string, unknown> = {};
 
   let detail: unknown;
   try {
@@ -59,11 +69,12 @@ export async function apiError(res: Response): Promise<ApiError> {
   }
 
   if (detail && typeof detail === "object") {
-    const { code: c, message: m, params } = detail as {
+    const { code: c, message: m, params: p } = detail as {
       code?: unknown;
       message?: unknown;
       params?: Record<string, unknown>;
     };
+    if (p && typeof p === "object") params = p;
     // The server's own sentence first, so whatever happens below the reader
     // gets words rather than a payload.
     if (typeof m === "string" && m) message = m;
@@ -74,7 +85,7 @@ export async function apiError(res: Response): Promise<ApiError> {
         // String(): t() is typed to allow an object for a key naming a
         // group rather than a leaf, which these never do.
         message = String(
-          i18n.t(`errors.${c}`, { ...(params ?? {}), defaultValue: message }),
+          i18n.t(`errors.${c}`, { ...params, defaultValue: message }),
         );
       } catch {
         // i18n not ready — the server's sentence already stands.
@@ -82,6 +93,6 @@ export async function apiError(res: Response): Promise<ApiError> {
     }
   }
 
-  return new ApiError(message, res.status, code);
+  return new ApiError(message, res.status, code, params);
 }
 

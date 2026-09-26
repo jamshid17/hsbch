@@ -199,6 +199,10 @@ export default {
       auto_blocked: "Chekdan boshqa rasm {{total}} marta yuborilgani uchun hisobingiz avtomatik bloklandi.",
     },
   },
+  blocked: {
+    contactHint: "Xato deb hisoblasangiz, admin bilan bog'laning.",
+    contact: "@{{admin}} ga yozish",
+  },
   summary: {
     markPaid: "{{name}} to'ladi deb belgilash",
     markUnpaid: "{{name}} ning to'lovini bekor qilish",

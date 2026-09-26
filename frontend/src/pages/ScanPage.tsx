@@ -12,6 +12,7 @@ import {
 import { haptic } from "../telegram";
 import AlertSheet from "../components/AlertSheet";
 import Paywall from "../components/Paywall";
+import BlockedScreen from "../components/BlockedScreen";
 
 export default function ScanPage() {
   const { t } = useTranslation();
@@ -26,7 +27,9 @@ export default function ScanPage() {
   const [notReceipt, setNotReceipt] = useState(false);
   // Set by the scan that tipped the non-receipt count over the limit: the
   // account is blocked from here on, so the screen stops offering anything.
-  const [blocked, setBlocked] = useState("");
+  const [blocked, setBlocked] = useState<{ message: string; admin?: string } | null>(
+    null,
+  );
 
   const { data: me } = useQuery({
     queryKey: ["me"],
@@ -84,7 +87,10 @@ export default function ScanPage() {
         setQuotaExceeded(true);
         setError(e.message);
       } else if (e instanceof ApiError && e.status === 403) {
-        setBlocked(e.message);
+        setBlocked({
+          message: e.message,
+          admin: typeof e.params.admin === "string" ? e.params.admin : undefined,
+        });
       } else if (
         e instanceof ApiError &&
         (e.code === "scan.not_a_receipt" || e.code === "scan.not_a_receipt_warning")
@@ -109,9 +115,18 @@ export default function ScanPage() {
   // Same dead end the auth gate shows on the next open, reached mid-session.
   if (blocked) {
     return (
-      <div className="page" style={{ textAlign: "center", paddingTop: 48 }}>
-        <div style={{ fontSize: 40 }}>🚫</div>
-        <p style={{ fontSize: 15, lineHeight: 1.5 }}>{blocked}</p>
+      <div
+        className="page"
+        style={{
+          textAlign: "center",
+          paddingTop: 48,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 16,
+        }}
+      >
+        <BlockedScreen message={blocked.message} admin={blocked.admin} />
       </div>
     );
   }

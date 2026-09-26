@@ -198,6 +198,10 @@ export default {
       auto_blocked: "Your account has been blocked automatically for sending something other than a receipt {{total}} times.",
     },
   },
+  blocked: {
+    contactHint: "If you think this is a mistake, contact the admin.",
+    contact: "Message @{{admin}}",
+  },
   summary: {
     markPaid: "Mark {{name}} as paid",
     markUnpaid: "Mark {{name}} as not paid",

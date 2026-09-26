@@ -71,6 +71,10 @@ export function useTelegramAuth(): AuthContextValue {
         // account. Retrying will not help, so the gate says so instead of
         // offering the button.
         isBlocked: err instanceof ApiError && err.status === 403,
+        blockedContact:
+          err instanceof ApiError && typeof err.params.admin === "string"
+            ? err.params.admin
+            : undefined,
       });
     }
   }, []);

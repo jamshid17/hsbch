@@ -134,6 +134,7 @@ def _record_not_a_receipt(db: Session, telegram_user_id: int) -> HTTPException:
             f"Chekdan boshqa rasm {limit} marta yuborilgani uchun hisobingiz "
             "avtomatik bloklandi.",
             total=limit,
+            admin=settings.admin_contact,
         )
 
     db.commit()

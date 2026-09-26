@@ -16,6 +16,8 @@ export interface AuthState {
   /** An admin has blocked this account. A dead end, not a failure to retry:
    * `error` carries the reason, when one was given. */
   isBlocked: boolean;
+  /** Telegram handle to contact about the block, as the server sent it. */
+  blockedContact?: string;
 }
 
 /** Auth context value: state plus a manual retry. */

@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useTelegramAuth } from "./useTelegramAuth";
 import LandingPage from "../pages/LandingPage";
+import BlockedScreen from "../components/BlockedScreen";
 import type { AuthContextValue } from "../types/auth";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -58,8 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   if (auth.isBlocked) {
     return (
       <GateScreen>
-        <div style={{ fontSize: 40 }}>🚫</div>
-        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.5 }}>{auth.error}</p>
+        <BlockedScreen message={auth.error ?? ""} admin={auth.blockedContact} />
       </GateScreen>
     );
   }

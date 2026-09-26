@@ -199,6 +199,9 @@ def _reject_if_blocked(db: Session, user: TelegramUser) -> TelegramUser:
     Every authenticated endpoint resolves the caller through this dependency,
     so checking here is what makes the block total — rather than a list of
     routes someone has to remember to add the next one to.
+
+    `admin` rides along because a blocked user can't ask /me for it: it is
+    the one thing on that screen they can still act on.
     """
     row = db.get(BotUser, user.id)
     if row is not None and row.blocked_at is not None:
@@ -208,8 +211,11 @@ def _reject_if_blocked(db: Session, user: TelegramUser) -> TelegramUser:
                 "account.blocked_reason",
                 f"{BLOCKED_MESSAGE} Sabab: {row.block_reason}",
                 reason=row.block_reason,
+                admin=settings.admin_contact,
             )
-        raise api_error(403, "account.blocked", BLOCKED_MESSAGE)
+        raise api_error(
+            403, "account.blocked", BLOCKED_MESSAGE, admin=settings.admin_contact
+        )
     return user
 
 
