@@ -68,3 +68,17 @@ def test_the_refusal_is_a_sentence_the_user_can_act_on():
         _reject_if_not_a_receipt(result(is_receipt=False, prices=()))
 
     assert "chek" in str(exc.value).lower()
+
+
+def test_only_the_models_outright_no_counts_towards_the_block():
+    """Three strikes block the account, so a strike has to be something the
+    sender did — not a real receipt photographed too dark to read."""
+    with pytest.raises(ReceiptScanError) as said_no:
+        _reject_if_not_a_receipt(result(is_receipt=False, prices=()))
+    with pytest.raises(ReceiptScanError) as came_back_empty:
+        _reject_if_not_a_receipt(result(prices=()))
+
+    assert said_no.value.strike
+    assert not came_back_empty.value.strike
+    # The flag steers the router; it is not a placeholder for the sentence.
+    assert "strike" not in said_no.value.params

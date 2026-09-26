@@ -176,6 +176,12 @@ class BotUser(Base):
     blocked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     blocked_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     block_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Scans the model called "not a receipt", ever. Reaching
+    # settings.not_a_receipt_block_after blocks the account (blocked_by stays
+    # NULL — nobody did it, the rule did); unblocking starts the count over.
+    not_receipt_strikes: Mapped[int] = mapped_column(
+        nullable=False, default=0, server_default="0"
+    )
 
 
 class Payment(Base):

@@ -177,6 +177,7 @@ export default {
     },
     scan: {
       not_a_receipt: "That doesn't look like a receipt. Photograph the receipt itself and try again.",
+      not_a_receipt_warning: "That doesn't look like a receipt. Warning: {{left}} more non-receipt photo(s) and your account will be blocked automatically.",
       unsupported_format: "That image format ({{format}}) isn't supported. Upload a JPEG or PNG.",
       ai_error: "The scanning service returned an error ({{status}}). Try again shortly.",
       ai_unreachable: "Couldn't reach the scanning service. Try again later.",
@@ -194,6 +195,7 @@ export default {
     account: {
       blocked: "Your account is blocked.",
       blocked_reason: "Your account is blocked. Reason: {{reason}}",
+      auto_blocked: "Your account has been blocked automatically for sending something other than a receipt {{total}} times.",
     },
   },
   summary: {

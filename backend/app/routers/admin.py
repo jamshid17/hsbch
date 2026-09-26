@@ -533,6 +533,8 @@ def unblock_user(
     user.blocked_at = None
     user.blocked_by = None
     user.block_reason = None
+    # A fresh start, or the next stray photo would block them straight back.
+    user.not_receipt_strikes = 0
     db.commit()
     logger.info("admin %s unblocked %s", admin.id, telegram_user_id)
     return {"telegram_user_id": telegram_user_id, "is_blocked": False}

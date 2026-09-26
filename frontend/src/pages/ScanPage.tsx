@@ -24,6 +24,9 @@ export default function ScanPage() {
   // "That is not a receipt" is the user's to fix, not a fault — it reads
   // as a warning next to the photo rather than as something broken.
   const [notReceipt, setNotReceipt] = useState(false);
+  // Set by the scan that tipped the non-receipt count over the limit: the
+  // account is blocked from here on, so the screen stops offering anything.
+  const [blocked, setBlocked] = useState("");
 
   const { data: me } = useQuery({
     queryKey: ["me"],
@@ -80,7 +83,12 @@ export default function ScanPage() {
       } else if (e instanceof ApiError && e.status === 402) {
         setQuotaExceeded(true);
         setError(e.message);
-      } else if (e instanceof ApiError && e.code === "scan.not_a_receipt") {
+      } else if (e instanceof ApiError && e.status === 403) {
+        setBlocked(e.message);
+      } else if (
+        e instanceof ApiError &&
+        (e.code === "scan.not_a_receipt" || e.code === "scan.not_a_receipt_warning")
+      ) {
         setNotReceipt(true);
         setError(e.message);
       } else if (e instanceof ApiError && (e.status === 413 || e.status === 415)) {
@@ -97,6 +105,16 @@ export default function ScanPage() {
   // the paid tier is switched off.
   const locked =
     !!me && me.subscriptions_enabled && !me.is_subscribed && me.scans_left === 0;
+
+  // Same dead end the auth gate shows on the next open, reached mid-session.
+  if (blocked) {
+    return (
+      <div className="page" style={{ textAlign: "center", paddingTop: 48 }}>
+        <div style={{ fontSize: 40 }}>🚫</div>
+        <p style={{ fontSize: 15, lineHeight: 1.5 }}>{blocked}</p>
+      </div>
+    );
+  }
 
   if (locked && me) {
     return (

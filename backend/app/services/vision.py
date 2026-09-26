@@ -21,11 +21,15 @@ class ReceiptScanError(Exception):
 
     `code` and `params` travel with it so the router can hand the client
     something it can say in the reader's own language (see app/errors.py).
+    `strike` marks the one failure that is the sender's doing on purpose —
+    the model looked and said it wasn't a receipt — and counts towards the
+    automatic block.
     """
 
-    def __init__(self, message: str, code: str, **params):
+    def __init__(self, message: str, code: str, *, strike: bool = False, **params):
         super().__init__(message)
         self.code = code
+        self.strike = strike
         self.params = params
 
 
@@ -68,9 +72,13 @@ def _reject_if_not_a_receipt(result: ScanResult) -> None:
 
     Raising here also gives the free scan back — the caller releases the slot
     for any ReceiptScanError — so a photo of a cat costs nothing.
+
+    Only the model's outright no is a strike. An empty reply is as often a
+    real receipt photographed too dark to read, and blocking someone for a
+    bad photo of the right thing would be the app's mistake, not theirs.
     """
     if not result.is_receipt:
-        raise ReceiptScanError(NOT_A_RECEIPT, code="scan.not_a_receipt")
+        raise ReceiptScanError(NOT_A_RECEIPT, code="scan.not_a_receipt", strike=True)
     if not any(item.price > 0 for item in result.items):
         raise ReceiptScanError(NOT_A_RECEIPT, code="scan.not_a_receipt")
 

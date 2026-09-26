@@ -8,8 +8,9 @@ from app.errors import api_error
 from app.models import BotUser, Item, ReceiptScan
 from app.models import Session as SessionModel
 from app.schemas import ScanResult
+from app.services.admin_auth import is_admin
 from app.services.telegram_auth import TelegramUser, get_tg_user
-from app.services.vision import ReceiptScanError, scan_receipt
+from app.services.vision import NOT_A_RECEIPT, ReceiptScanError, scan_receipt
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy import func, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -83,6 +84,68 @@ def _release_scan_slot(db: Session, telegram_user_id: int) -> None:
         .values(free_scans_used=func.greatest(BotUser.free_scans_used - 1, 0))
     )
     db.commit()
+
+
+AUTO_BLOCK_REASON = "Chek o'rniga boshqa rasmlar yuborilgan"
+
+
+def _record_not_a_receipt(db: Session, telegram_user_id: int) -> HTTPException:
+    """Count a photo the model said wasn't a receipt, and say what's next.
+
+    The first strikes are a warning that names how many are left, so the
+    block never comes as a surprise; the last one blocks on the spot and says
+    why. Admins test with whatever photo is at hand and are never counted.
+
+    The increment is one UPDATE … RETURNING, so two scans racing each other
+    can't both read "one left" and both get away with it.
+    """
+    limit = settings.not_a_receipt_block_after
+    if is_admin(db, telegram_user_id):
+        return api_error(422, "scan.not_a_receipt", NOT_A_RECEIPT)
+
+    db.execute(
+        pg_insert(BotUser)
+        .values(telegram_user_id=telegram_user_id)
+        .on_conflict_do_nothing(index_elements=[BotUser.telegram_user_id])
+    )
+    strikes = db.execute(
+        update(BotUser)
+        .where(BotUser.telegram_user_id == telegram_user_id)
+        .values(not_receipt_strikes=BotUser.not_receipt_strikes + 1)
+        .returning(BotUser.not_receipt_strikes)
+    ).scalar_one()
+
+    if strikes >= limit:
+        db.execute(
+            update(BotUser)
+            .where(
+                BotUser.telegram_user_id == telegram_user_id,
+                BotUser.blocked_at.is_(None),
+            )
+            .values(blocked_at=datetime.utcnow(), block_reason=AUTO_BLOCK_REASON)
+        )
+        db.commit()
+        logger.info(
+            "auto-blocked %s after %s non-receipt scans", telegram_user_id, strikes
+        )
+        return api_error(
+            403,
+            "account.auto_blocked",
+            f"Chekdan boshqa rasm {limit} marta yuborilgani uchun hisobingiz "
+            "avtomatik bloklandi.",
+            total=limit,
+        )
+
+    db.commit()
+    left = limit - strikes
+    return api_error(
+        422,
+        "scan.not_a_receipt_warning",
+        f"Bu chek emasga o'xshaydi. Ogohlantirish: chekdan boshqa rasm yana "
+        f"{left} marta yuborilsa, hisobingiz avtomatik bloklanadi.",
+        left=left,
+        total=limit,
+    )
 
 
 def _log_scan(db: Session, telegram_user_id: int, session_id: uuid.UUID) -> None:
@@ -180,6 +243,8 @@ async def upload_receipt(
     except ReceiptScanError as e:
         # Expected, user-facing failure (bad format, AI error, unparseable reply)
         _release_scan_slot(db, tg_user.id)
+        if e.strike:
+            raise _record_not_a_receipt(db, tg_user.id)
         raise api_error(422, e.code, str(e), **e.params)
     except Exception as e:  # noqa: BLE001 - surface the real cause to the client
         logger.exception("Unexpected error while scanning receipt")

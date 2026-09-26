@@ -178,6 +178,7 @@ export default {
     },
     scan: {
       not_a_receipt: "Bu chek emasga o'xshaydi. Chekning o'zini suratga olib, qayta urinib ko'ring.",
+      not_a_receipt_warning: "Bu chek emasga o'xshaydi. Ogohlantirish: chekdan boshqa rasm yana {{left}} marta yuborilsa, hisobingiz avtomatik bloklanadi.",
       unsupported_format: "Bu rasm formati ({{format}}) qo'llab-quvvatlanmaydi. JPEG yoki PNG yuklang.",
       ai_error: "Skanerlash xizmatida xatolik ({{status}}). Birozdan keyin urinib ko'ring.",
       ai_unreachable: "Skanerlash xizmatiga ulanib bo'lmadi. Keyinroq urinib ko'ring.",
@@ -195,6 +196,7 @@ export default {
     account: {
       blocked: "Hisobingiz bloklangan.",
       blocked_reason: "Hisobingiz bloklangan. Sabab: {{reason}}",
+      auto_blocked: "Chekdan boshqa rasm {{total}} marta yuborilgani uchun hisobingiz avtomatik bloklandi.",
     },
   },
   summary: {

@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     # Lifetime free receipt scans per user (not per day) before a subscription
     # is required. Only enforced while subscriptions_enabled is true.
     free_total_scans: int = 5
+    # Photos the model says aren't a receipt at all — a selfie, a meme, a
+    # screenshot — before the account is blocked automatically. Every one
+    # still costs a vision call, and the free-scan refund means the quota
+    # never stops anyone; this does. Admins are never counted.
+    not_a_receipt_block_after: int = 3
     # Comma-separated Telegram user ids seeded as admins on first deploy.
     # The FIRST id is the super admin: always an admin, and the one account no
     # other admin can demote. The rest are ordinary admins from then on —
